@@ -1,0 +1,74 @@
+import torch
+import torch.nn as nn
+import torch.optim as optim
+import numpy as np
+from sklearn.metrics import roc_auc_score
+
+
+class Network(nn.Module):
+    def __init__(self, input_dim, hidden_dim_first, hidden_dim_second, output_dim):
+        super(Network, self).__init__()
+        self.relu = nn.ReLU()
+        self.sigm = nn.Sigmoid()
+        self.drop = nn.Dropout(0.2)
+        self.inp = nn.Linear(input_dim, hidden_dim_first)
+        self.lin = nn.Linear(hidden_dim_first, hidden_dim_second) 
+        self.out = nn.Linear(hidden_dim_second, output_dim)  
+
+    def forward(self, x):
+        x = self.relu(self.inp(x))
+        x = self.relu(self.lin(x))
+        x = self.drop(x)
+        x = self.sigm(self.out(x))         
+        return x
+    
+    def train(self, X_train, y_train, epochs=100, batch_size=32, learning_rate=0.01):
+        X = torch.tensor(X_train.values, dtype=torch.float32)
+        y = torch.tensor(y_train.values, dtype=torch.float32)
+
+        dataset = torch.utils.data.TensorDataset(X, y)
+        data_loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True)
+
+        criterion = nn.BCELoss()
+        optimizer = optim.Adam(self.parameters(), lr=learning_rate, amsgrad=True, weight_decay=0.01)
+
+        for epoch in range(epochs):
+            for batch_X, batch_y in data_loader:
+                optimizer.zero_grad()
+                outputs = self(batch_X)
+                loss = criterion(outputs, batch_y)
+                loss.backward()
+                torch.nn.utils.clip_grad_norm_(self.parameters(), 1.0)
+                optimizer.step()
+
+            print(f'|Epoch: {epoch+1}|, Loss --> {loss.item()}')
+
+    def predict(self, X_test):
+        X = torch.tensor(X_test, dtype=torch.float32)
+
+        self.eval()
+
+        with torch.no_grad():
+            outputs = self(X)
+
+        predicted_proba = torch.sigmoid(outputs)[:, 1]
+        predicted = (predicted_proba > 0.5).int()
+
+        return predicted.numpy()
+
+    def evaluate(self, X_test, y_test):
+        X = torch.tensor(X_test, dtype=torch.float32)
+        y = torch.tensor(y_test, dtype=torch.float32)
+
+        with torch.no_grad():
+            outputs = self(X)
+
+        predicted_proba = torch.sigmoid(outputs)[:, 1]
+        predicted = (predicted_proba > 0.5).int()
+
+        accuracy = (predicted == y).sum().item() / len(y_test)
+
+        y_pred_proba = torch.softmax(outputs, dim=1)[:, 1].detach().numpy()
+        auc_roc = roc_auc_score(y_test, y_pred_proba)
+
+        return accuracy, auc_roc

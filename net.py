@@ -7,7 +7,11 @@ from sklearn.metrics import roc_auc_score
 from pandas import DataFrame
 from typing import Tuple
 
+DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
+if torch.cuda.is_available():
+    torch.set_default_tensor_type(torch.cuda.FloatTensor)
+    
 class Network(nn.Module):
     def __init__(self, input_dim: int, hidden_dim_first: int, hidden_dim_second: int, output_dim: int):
         """

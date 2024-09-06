@@ -36,12 +36,30 @@ class Network(nn.Module):
         x: torch.Tensor = self.sigm(self.out(x))
         return x
     
-    def train(self, X_train: DataFrame | Series | np.ndarray, 
+    def train(self, 
+            X_train: DataFrame | Series | np.ndarray, 
             y_train: DataFrame | Series | np.ndarray, 
             epochs: int = 100, 
             batch_size: int = 32, 
             learning_rate: int = 0.01,
-            debug: bool = False):
+            debug: bool = False) -> None:
+        """
+        Trains the model on the given training data.
+
+        Parameters:
+        X_train (pd.DataFrame | pd.Series | np.ndarray): The input features for training.
+        y_train (pd.DataFrame | pd.Series | np.ndarray): The target variable for training.
+        epochs (int, optional): The number of epochs to train the model. Defaults to 100.
+        batch_size (int, optional): The batch size for training. Defaults to 32.
+        learning_rate (int, optional): The learning rate for the optimizer. Defaults to 0.01.
+        debug (bool, optional): Whether to print debug information (output tensors) during training. Defaults to False.
+                
+        Returns:
+        None, just trains the model.
+
+        Notes:
+        This method trains the model using the Adam optimizer and binary cross-entropy loss, controlling loss at each epoch state.
+        """
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.to(device)
 

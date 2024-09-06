@@ -15,10 +15,15 @@ This guideline only utilizes the main model Network, omitting abstract and auror
 
 from net import Network
 
-net = Network(input_dim=X_train.shape[1], hidden_dim_first=512, hidden_dim_second=256, output_dim=1)
-net.train(X_train=X_train, y_train=y_train)
+net = Network(
+  input_dim=X_train.shape[1],
+  hidden_dim_first=512,
+  hidden_dim_second=256,
+  output_dim=1
+)
+net.train(X_train, y_train)
 # Optionally you can pass batch_size, epochs
 # learning_rate and debug (to see tensors)
-#to the train method
+# to the train method
 net.predict(X_test)
 ```

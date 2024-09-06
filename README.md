@@ -12,6 +12,7 @@ This guideline only utilizes the main model Network, omitting abstract and auror
 ```python
 # Obtain your dataset and perform train/test split, having
 # X_train, X_test, y_train and y_test
+# Don't forget to normalize data using, for example, StandardScaler()
 
 from net import Network
 

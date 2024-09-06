@@ -31,16 +31,17 @@ class Network(nn.Module):
         Forward pass method
         """
         x: torch.Tensor = self.relu(self.inp(x))
-        x: torch.Tensor = self.relu(self.lin(x))
         x: torch.Tensor = self.drop(x)
-        x: torch.Tensor = self.sigm(self.out(x))      
+        x: torch.Tensor = self.relu(self.lin(x))
+        x: torch.Tensor = self.sigm(self.out(x))
         return x
     
     def train(self, X_train: DataFrame | Series | np.ndarray, 
             y_train: DataFrame | Series | np.ndarray, 
             epochs: int = 100, 
             batch_size: int = 32, 
-            learning_rate: int = 0.01):
+            learning_rate: int = 0.01,
+            debug: bool = False):
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.to(device)
 
@@ -59,6 +60,8 @@ class Network(nn.Module):
                 batch_X, batch_y = batch_X.to(device), batch_y.to(device)
                 optimizer.zero_grad()
                 outputs = self(batch_X)
+                if debug:
+                    print(f"Grads tensor: {outputs}")
                 loss = criterion(outputs, batch_y)
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(self.parameters(), 1.0)

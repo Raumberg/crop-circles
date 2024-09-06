@@ -2,9 +2,10 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import numpy as np
+import pandas as pd
 from sklearn.metrics import roc_auc_score
 
-from pandas import DataFrame
+from pandas import DataFrame, Series
 from typing import Tuple
 
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -35,12 +36,16 @@ class Network(nn.Module):
         x: torch.Tensor = self.sigm(self.out(x))      
         return x
     
-    def train(self, X_train: pd.DataFrame, y_train: pd.DataFrame, epochs: int = 100, batch_size: int = 32, learning_rate: int = 0.01):
+    def train(self, X_train: DataFrame | Series | np.ndarray, 
+            y_train: DataFrame | Series | np.ndarray, 
+            epochs: int = 100, 
+            batch_size: int = 32, 
+            learning_rate: int = 0.01):
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.to(device)
-    
-        X = torch.tensor(X_train.values, dtype=torch.float32)
-        y = torch.tensor(y_train.values, dtype=torch.float32)
+
+        X = torch.from_numpy(X_train.values if isinstance(X_train, (DataFrame | Series)) else X_train).float()
+        y = torch.from_numpy(y_train.values if isinstance(y_train, (DataFrame | Series)) else y_train).float()
 
         dataset = torch.utils.data.TensorDataset(X, y)
         data_loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True)
@@ -50,6 +55,7 @@ class Network(nn.Module):
 
         for epoch in range(epochs):
             for batch_X, batch_y in data_loader:
+                batch_y = batch_y.unsqueeze(-1)
                 batch_X, batch_y = batch_X.to(device), batch_y.to(device)
                 optimizer.zero_grad()
                 outputs = self(batch_X)
@@ -60,7 +66,7 @@ class Network(nn.Module):
 
             print(f'|Epoch: {epoch+1}|, Loss --> {loss.item()}')
 
-    def predict(self, X_test: pd.DataFrame) -> np.ndarray:
+    def predict(self, X_test: DataFrame) -> np.ndarray:
         X = torch.tensor(X_test, dtype=torch.float32)
 
         self.eval()
@@ -73,7 +79,7 @@ class Network(nn.Module):
 
         return predicted.numpy()
 
-    def evaluate(self, X_test: pd.DataFrame, y_test: pd.DataFrame) -> Tuple[float, float]:
+    def evaluate(self, X_test: DataFrame, y_test: DataFrame) -> Tuple[float, float]:
         X = torch.tensor(X_test, dtype=torch.float32)
         y = torch.tensor(y_test, dtype=torch.float32)
 

@@ -131,7 +131,6 @@ class Network(nn.Module):
                     progbar.update(batch_idx + 1, [("loss", loss.item())])
             avg_loss = epoch_loss / len(data_loader)
             console.print(f"[bold]Epoch {epoch+1}, Average Loss:[/bold] {avg_loss:.4f}")
-            console.print("-------------------------")
 
     def predict(self, X_test: DataFrame) -> np.ndarray:
         X = torch.tensor(X_test, dtype=torch.float32)

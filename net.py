@@ -161,3 +161,28 @@ class Network(nn.Module):
         auc_roc = roc_auc_score(y_test, y_pred_proba)
 
         return accuracy, auc_roc
+
+    def save(self, path: str) -> None:
+        """
+        Saves the model's state to a file.
+
+        Args:
+            path (str): The path to the file containing the model's state.
+
+        Returns:
+            None, just saves the model
+        """
+        torch.save(self.state_dict(), f"{path}_nl.pth")
+
+    def load(self, path: str) -> None:
+        """
+        Loads the model's state from a file.
+
+        Args:
+            path (str): The path to the file containing the model's state.
+
+        Returns:
+            None, just loads the model
+        """
+    self.load_state_dict(torch.load(path, map_location=torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')))
+    self.eval()

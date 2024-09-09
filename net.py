@@ -146,6 +146,16 @@ class Network(nn.Module):
         return predicted.numpy()
 
     def evaluate(self, X_test: DataFrame, y_test: DataFrame) -> Tuple[float, float]:
+        """
+        Evaluates the model on the test data.
+
+        Args:
+            X_test (DataFrame | Series | np.ndarray): The input features of the test data.
+            y_test (DataFrame | Series | np.ndarray): The target variable of the test data.
+
+        Returns:
+            float, float: The Accuracy and AUC/ROC score of the model on the test data.
+        """
         X = torch.tensor(X_test, dtype=torch.float32)
         y = torch.tensor(y_test, dtype=torch.float32)
 
@@ -156,9 +166,7 @@ class Network(nn.Module):
         predicted = (predicted_proba > 0.5).int()
 
         accuracy = (predicted == y).sum().item() / len(y_test)
-
-        y_pred_proba = torch.softmax(outputs, dim=1)[:, 1].detach().numpy()
-        auc_roc = roc_auc_score(y_test, y_pred_proba)
+        auc_roc = roc_auc_score(y_test, predicted_proba.detach().numpy())
 
         return accuracy, auc_roc
 

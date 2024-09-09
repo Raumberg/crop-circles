@@ -132,20 +132,19 @@ class Network(nn.Module):
             avg_loss = epoch_loss / len(data_loader)
             console.print(f"[bold]Epoch {epoch+1}, Average Loss:[/bold] {avg_loss:.4f}")
 
-    def predict(self, X_test: DataFrame) -> np.ndarray:
-        X = torch.tensor(X_test, dtype=torch.float32)
+    def predict(self, X_test: DataFrame | Series | np.ndarray) -> np.ndarray:
+        X = torch.from_numpy(X_test.values if isinstance(X_test, (DataFrame | Series)) else X_test).float()
 
-        self.eval()
+        # self.eval()
 
         with torch.no_grad():
             outputs = self(X)
 
-        predicted_proba = torch.sigmoid(outputs)[:, 1]
-        predicted = (predicted_proba > 0.5).int()
+        predicted = (outputs > 0.5).int()
 
         return predicted.numpy()
 
-    def evaluate(self, X_test: DataFrame, y_test: DataFrame) -> Tuple[float, float]:
+    def evaluate(self, X_test: DataFrame | Series | np.ndarray, y_test: DataFrame | Series | np.ndarray) -> Tuple[float, float]:
         """
         Evaluates the model on the test data.
 
@@ -156,17 +155,17 @@ class Network(nn.Module):
         Returns:
             float, float: The Accuracy and AUC/ROC score of the model on the test data.
         """
-        X = torch.tensor(X_test, dtype=torch.float32)
-        y = torch.tensor(y_test, dtype=torch.float32)
+        X = torch.from_numpy(X_test.values if isinstance(X_test, (DataFrame | Series)) else X_test).float()
+        y = torch.from_numpy(y_test.values if isinstance(y_test, (DataFrame | Series)) else y_test).float()
 
         with torch.no_grad():
+            # self.eval()
             outputs = self(X)
 
-        predicted_proba = torch.sigmoid(outputs)[:, 1]
-        predicted = (predicted_proba > 0.5).int()
+        predicted = (outputs > 0.5).int()
 
         accuracy = (predicted == y).sum().item() / len(y_test)
-        auc_roc = roc_auc_score(y_test, predicted_proba.detach().numpy())
+        auc_roc = roc_auc_score(y_test, outputs.detach().numpy())
 
         return accuracy, auc_roc
 
@@ -192,5 +191,5 @@ class Network(nn.Module):
         Returns:
             None, just loads the model
         """
-    self.load_state_dict(torch.load(path, map_location=torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')))
-    self.eval()
+        self.load_state_dict(torch.load(path, map_location=torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')))
+        self.eval()

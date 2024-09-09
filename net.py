@@ -172,7 +172,7 @@ class Network(nn.Module):
         if proba:
             return all_outputs.numpy()
         else:
-            if len(np.unique(self.classes_)) == 2:
+            if len(all_outputs.shape) == 1:
                 predicted = (all_outputs > 0.5).int()
             else:
                 predicted = torch.argmax(all_outputs, dim=1)
@@ -201,8 +201,8 @@ class Network(nn.Module):
 
         if use_batching:
             total_correct = 0
-            total_auc_roc = 0
-            total_samples = 0
+            total_outputs = []
+            total_labels = []
             with torch.no_grad():
                 self.eval()
                 for i in range(0, len(X), batch_size):
@@ -214,16 +214,11 @@ class Network(nn.Module):
                     predicted = (outputs > 0.5).int()
 
                     total_correct += (predicted == batch_y.unsqueeze(-1)).sum().item()
-                    total_samples += len(batch_y)
+                    total_outputs.extend(outputs.detach().numpy())
+                    total_labels.extend(batch_y.numpy())
 
-                    if len(torch.unique(batch_y)) == 2:
-                        auc_roc = roc_auc_score(batch_y.numpy(), outputs.detach().numpy())
-                        total_auc_roc += auc_roc
-                    else:
-                        total_auc_roc += 0
-
-            accuracy = total_correct / total_samples
-            auc_roc = total_auc_roc / (total_samples // batch_size)
+            accuracy = total_correct / len(y_test)
+            auc_roc = roc_auc_score(total_labels, total_outputs)
         else:
             with torch.no_grad():
                 self.eval()

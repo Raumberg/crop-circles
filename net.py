@@ -8,6 +8,21 @@ from sklearn.metrics import roc_auc_score
 from pandas import DataFrame, Series
 from typing import Tuple
 
+try:
+    import IPython
+    if IPython.get_ipython().__class__.__name__ == 'ZMQInteractiveShell':
+        from tqdm.notebook import tqdm
+    else:
+        from tqdm import tqdm
+except (ImportError, NameError):
+    from tqdm import tqdm
+
+from rich import print
+from rich.console import Console
+from rich.table import Table
+
+console = Console()
+
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 if torch.cuda.is_available():
@@ -42,24 +57,7 @@ class Network(nn.Module):
             epochs: int = 100, 
             batch_size: int = 32, 
             learning_rate: int = 0.01,
-            debug: bool = False) -> None:
-        """
-        Trains the model on the given training data.
-
-        Parameters:
-        X_train (pd.DataFrame | pd.Series | np.ndarray): The input features for training.
-        y_train (pd.DataFrame | pd.Series | np.ndarray): The target variable for training.
-        epochs (int, optional): The number of epochs to train the model. Defaults to 100.
-        batch_size (int, optional): The batch size for training. Defaults to 32.
-        learning_rate (int, optional): The learning rate for the optimizer. Defaults to 0.01.
-        debug (bool, optional): Whether to print debug information (output tensors) during training. Defaults to False.
-                
-        Returns:
-        None, just trains the model.
-
-        Notes:
-        This method trains the model using the Adam optimizer and binary cross-entropy loss, controlling loss at each epoch state.
-        """
+            debug: bool = False):
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.to(device)
 
@@ -72,20 +70,40 @@ class Network(nn.Module):
         criterion = nn.BCELoss()
         optimizer = optim.Adam(self.parameters(), lr=learning_rate, amsgrad=True, weight_decay=0.01)
 
-        for epoch in range(epochs):
-            for batch_X, batch_y in data_loader:
-                batch_y = batch_y.unsqueeze(-1)
-                batch_X, batch_y = batch_X.to(device), batch_y.to(device)
-                optimizer.zero_grad()
-                outputs = self(batch_X)
-                if debug:
-                    print(f"Grads tensor: {outputs}")
-                loss = criterion(outputs, batch_y)
-                loss.backward()
-                torch.nn.utils.clip_grad_norm_(self.parameters(), 1.0)
-                optimizer.step()
+        console.print(f"[bold]Lake model[/bold]")
+        console.print(f"[bold]-------------------------[/bold]")
+        console.print(f"[bold green]Device:[/bold green] {device}")
+        console.print(f"[bold green]Epochs:[/bold green] {epochs}")
+        console.print(f"[bold green]Batch Size:[/bold green] {batch_size}")
+        console.print(f"[bold green]Learning Rate:[/bold green] {learning_rate}")
+        console.print(f"[bold]-------------------------[/bold]")
 
-            print(f'|Epoch: {epoch+1}|, Loss --> {loss.item()}')
+        for epoch in range(epochs):
+            epoch_loss = 0
+            table = Table(title=f"Epoch {epoch+1}")
+            table.add_column("Batch", justify="right", style="cyan")
+            table.add_column("Loss", justify="right", style="magenta")
+            with tqdm(data_loader, 
+            desc=f'|Epoch {epoch+1}|', 
+            unit='batches', 
+            ) as pbar:
+                for batch_X, batch_y in pbar:
+                    batch_y = batch_y.unsqueeze(-1)
+                    batch_X, batch_y = batch_X.to(device), batch_y.to(device)
+                    optimizer.zero_grad()
+                    outputs = self(batch_X)
+                    if debug:
+                        console.print(f"[bold]Grads tensor:[/bold] {outputs}")
+                    loss = criterion(outputs, batch_y)
+                    loss.backward()
+                    torch.nn.utils.clip_grad_norm_(self.parameters(), 1.0)
+                    optimizer.step()
+                    epoch_loss += loss.item()
+                    pbar.set_postfix({'loss': f'{loss.item():.4f}'})
+            avg_loss = epoch_loss / len(data_loader)
+            console.print(table)
+            console.print(f"[bold]Epoch {epoch+1}, Average Loss:[/bold] {avg_loss:.4f}")
+            console.print("-------------------------")
 
     def predict(self, X_test: DataFrame) -> np.ndarray:
         X = torch.tensor(X_test, dtype=torch.float32)

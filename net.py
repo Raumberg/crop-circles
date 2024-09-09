@@ -130,7 +130,7 @@ class Network(nn.Module):
                     epoch_loss += loss.item()
                     progbar.update(batch_idx + 1, [("loss", loss.item())])
             avg_loss = epoch_loss / len(data_loader)
-            console.print(f"[bold]Epoch {epoch+1}, Average Loss:[/bold] {avg_loss:.4f}")
+            console.print(f"[bold][Epoch {epoch+1}] | Loss >>[/bold] {avg_loss:.4f}")
 
     def predict(self, X_test: DataFrame | Series | np.ndarray) -> np.ndarray:
         X = torch.from_numpy(X_test.values if isinstance(X_test, (DataFrame | Series)) else X_test).float()
@@ -144,13 +144,19 @@ class Network(nn.Module):
 
         return predicted.numpy()
 
-    def evaluate(self, X_test: DataFrame | Series | np.ndarray, y_test: DataFrame | Series | np.ndarray) -> Tuple[float, float]:
+    def evaluate(self, 
+                X_test: DataFrame | Series | np.ndarray, 
+                y_test: DataFrame | Series | np.ndarray,
+                use_batching: bool = False,
+                batch_size: int = 1024) -> Tuple[float, float]:
         """
         Evaluates the model on the test data.
 
         Args:
             X_test (DataFrame | Series | np.ndarray): The input features of the test data.
             y_test (DataFrame | Series | np.ndarray): The target variable of the test data.
+            batch_size (int, optional): The batch size for evaluation. Defaults to 32.
+            use_batching (bool, optional): Whether to use batching during evaluation. Defaults to True.
 
         Returns:
             float, float: The Accuracy and AUC/ROC score of the model on the test data.
@@ -158,14 +164,39 @@ class Network(nn.Module):
         X = torch.from_numpy(X_test.values if isinstance(X_test, (DataFrame | Series)) else X_test).float()
         y = torch.from_numpy(y_test.values if isinstance(y_test, (DataFrame | Series)) else y_test).float()
 
-        with torch.no_grad():
-            # self.eval()
-            outputs = self(X)
+        if use_batching:
+            total_correct = 0
+            total_auc_roc = 0
+            total_samples = 0
+            with torch.no_grad():
+                # self.eval()
+                for i in range(0, len(X), batch_size):
+                    batch_X = X[i:i+batch_size]
+                    batch_y = y[i:i+batch_size]
 
-        predicted = (outputs > 0.5).int()
+                    outputs = self(batch_X)
 
-        accuracy = (predicted == y).sum().item() / len(y_test)
-        auc_roc = roc_auc_score(y_test, outputs.detach().numpy())
+                    predicted = (outputs > 0.5).int()
+
+                    total_correct += (predicted == batch_y.unsqueeze(-1)).sum().item()
+                    total_samples += len(batch_y)
+
+                    if len(torch.unique(batch_y)) == 2:
+                        auc_roc = roc_auc_score(batch_y.numpy(), outputs.detach().numpy())
+                        total_auc_roc += auc_roc
+                    else:
+                        total_auc_roc += 0
+
+            accuracy = total_correct / total_samples
+            auc_roc = total_auc_roc / (total_samples // batch_size)
+        else:
+            with torch.no_grad():
+                # self.eval()
+                outputs = self(X)
+                predicted = (outputs > 0.5).int()
+
+                accuracy = (predicted == y.unsqueeze(-1)).sum().item() / len(y_test)
+                auc_roc = roc_auc_score(y_test, outputs.detach().numpy())
 
         return accuracy, auc_roc
 

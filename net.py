@@ -52,7 +52,7 @@ class Network(nn.Module):
         x: torch.Tensor = self.sigm(self.out(x))
         return x
     
-    def train(self, 
+    def inject(self, 
             X_train: DataFrame | Series | np.ndarray, 
             y_train: DataFrame | Series | np.ndarray, 
             epochs: int = 100, 
@@ -78,7 +78,7 @@ class Network(nn.Module):
         """
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.to(device)
-        self.train_mode()
+        self.train()
 
         X = torch.from_numpy(X_train.values if isinstance(X_train, (DataFrame | Series)) else X_train).float()
         y = torch.from_numpy(y_train.values if isinstance(y_train, (DataFrame | Series)) else y_train).float()
@@ -153,7 +153,7 @@ class Network(nn.Module):
         """
         X = torch.from_numpy(X_test.values if isinstance(X_test, (DataFrame | Series)) else X_test).float()
 
-        self.eval_mode()
+        self.eval()
 
         if use_batching:
             all_outputs = []
@@ -204,7 +204,7 @@ class Network(nn.Module):
             total_auc_roc = 0
             total_samples = 0
             with torch.no_grad():
-                self.eval_mode()
+                self.eval()
                 for i in range(0, len(X), batch_size):
                     batch_X = X[i:i+batch_size]
                     batch_y = y[i:i+batch_size]
@@ -226,7 +226,7 @@ class Network(nn.Module):
             auc_roc = total_auc_roc / (total_samples // batch_size)
         else:
             with torch.no_grad():
-                self.eval_mode()
+                self.eval()
                 outputs = self(X)
                 predicted = (outputs > 0.5).int()
 
@@ -258,10 +258,4 @@ class Network(nn.Module):
             None, just loads the model
         """
         self.load_state_dict(torch.load(path, map_location=torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')))
-        self.eval_mode()
-
-    def train_mode(self, mode=True):
-        super().train(mode)
-
-    def eval_mode(self):
-        super().eval()
+        self.eval()

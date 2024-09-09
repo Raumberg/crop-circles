@@ -78,6 +78,7 @@ class Network(nn.Module):
         """
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.to(device)
+        self.train_mode()
 
         X = torch.from_numpy(X_train.values if isinstance(X_train, (DataFrame | Series)) else X_train).float()
         y = torch.from_numpy(y_train.values if isinstance(y_train, (DataFrame | Series)) else y_train).float()
@@ -132,23 +133,57 @@ class Network(nn.Module):
             avg_loss = epoch_loss / len(data_loader)
             console.print(f"[bold][Epoch {epoch+1}] | Loss >>[/bold] {avg_loss:.4f}")
 
-    def predict(self, X_test: DataFrame | Series | np.ndarray) -> np.ndarray:
+    def predict(self, 
+                X_test: DataFrame | Series | np.ndarray, 
+                proba: bool = False, 
+                use_batching: bool = False, 
+                batch_size: int = 32) -> np.ndarray:
+        """
+        Makes predictions on the input data.
+
+        Args:
+            X_test (DataFrame | Series | np.ndarray): The input features.
+            batch_size (int, optional): The batch size for prediction. Defaults to 32.
+            use_batching (bool, optional): Whether to use batch prediction.
+            proba (bool, optional): Whether to return probabilities instead of class labels. Defaults to False.
+
+        Returns:
+            np.ndarray: The predicted labels or probabilities.
+
+        """
         X = torch.from_numpy(X_test.values if isinstance(X_test, (DataFrame | Series)) else X_test).float()
 
-        # self.eval()
+        self.eval_mode()
 
-        with torch.no_grad():
-            outputs = self(X)
+        if use_batching:
+            all_outputs = []
+            with torch.no_grad():
+                for i in range(0, len(X), batch_size):
+                    batch_X = X[i:i+batch_size]
+                    outputs = self(batch_X)
+                    all_outputs.append(outputs)
 
-        predicted = (outputs > 0.5).int()
+            all_outputs = torch.cat(all_outputs)
 
-        return predicted.numpy()
+        else:
+            with torch.no_grad():
+                all_outputs = self(X)
+
+        if proba:
+            return all_outputs.numpy()
+        else:
+            if len(np.unique(self.classes_)) == 2:
+                predicted = (all_outputs > 0.5).int()
+            else:
+                predicted = torch.argmax(all_outputs, dim=1)
+
+            return predicted.numpy()
 
     def evaluate(self, 
                 X_test: DataFrame | Series | np.ndarray, 
                 y_test: DataFrame | Series | np.ndarray,
                 use_batching: bool = False,
-                batch_size: int = 1024) -> Tuple[float, float]:
+                batch_size: int = 32) -> Tuple[float, float]:
         """
         Evaluates the model on the test data.
 
@@ -169,7 +204,7 @@ class Network(nn.Module):
             total_auc_roc = 0
             total_samples = 0
             with torch.no_grad():
-                # self.eval()
+                self.eval_mode()
                 for i in range(0, len(X), batch_size):
                     batch_X = X[i:i+batch_size]
                     batch_y = y[i:i+batch_size]
@@ -191,7 +226,7 @@ class Network(nn.Module):
             auc_roc = total_auc_roc / (total_samples // batch_size)
         else:
             with torch.no_grad():
-                # self.eval()
+                self.eval_mode()
                 outputs = self(X)
                 predicted = (outputs > 0.5).int()
 
@@ -224,3 +259,9 @@ class Network(nn.Module):
         """
         self.load_state_dict(torch.load(path, map_location=torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')))
         self.eval()
+
+    def train_mode(self, mode=True):
+        super().train(mode)
+
+    def eval_mode(self):
+        super.eval()

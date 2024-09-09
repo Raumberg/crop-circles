@@ -258,10 +258,10 @@ class Network(nn.Module):
             None, just loads the model
         """
         self.load_state_dict(torch.load(path, map_location=torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')))
-        self.eval()
+        self.eval_mode()
 
     def train_mode(self, mode=True):
         super().train(mode)
 
     def eval_mode(self):
-        super.eval()
+        super().eval()

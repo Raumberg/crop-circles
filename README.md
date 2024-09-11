@@ -3,8 +3,9 @@ Pytorch based neural network for company's tabular data binary classification of
 Not new, not hard, but working
 ### Contents:
 * *nn*       -> main neural network for binary classification
-* *riegel* ->  embedding model for tabular categorical variables (with additional attention mechanism)
+* *riegel*   ->  embedding model for tabular categorical variables (with additional attention mechanism)
 * *aurora*   -> autoencoder model for tabular categorical variables, reducing dimentionality
+* *horizont* -> deep neural decision forest interpretation
 
 ## Try learning yourself:
 **Note:**  

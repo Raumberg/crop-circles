@@ -9,9 +9,9 @@ import numpy as np
 
 from tensorflow.keras.utils import Progbar
 
-class Baum(nn.Module):
+class SuperTree(nn.Module):
     def __init__(self, input_dim: int, hidden_dim: int, output_dim: int):
-        super(Baum, self).__init__()
+        super(SuperTree, self).__init__()
         self.inp = nn.Linear(input_dim, hidden_dim)
         self.out = nn.Linear(hidden_dim, output_dim)
         self.relu = nn.ReLU()
@@ -22,14 +22,14 @@ class Baum(nn.Module):
         x = self.out(x)
         return x
 
-class Wald(nn.Module):
+class SuperForest(nn.Module):
     def __init__(self, num_layers: int, input_dim: int, hidden_dim: int, output_dim: int):
-        super(Wald, self).__init__()
+        super(SuperForest, self).__init__()
         self.layers = nn.ModuleList()
-        self.layers.append(Baum(input_dim, hidden_dim, hidden_dim))
+        self.layers.append(SuperTree(input_dim, hidden_dim, hidden_dim))
         for _ in range(num_layers - 1):
-            self.layers.append(Baum(hidden_dim, hidden_dim, hidden_dim))
-        self.out = Baum(hidden_dim, hidden_dim, output_dim)
+            self.layers.append(SuperTree(hidden_dim, hidden_dim, hidden_dim))
+        self.out = SuperTree(hidden_dim, hidden_dim, output_dim)
         self.sigm = nn.Sigmoid()
 
     def forward(self, x):
@@ -182,10 +182,10 @@ class Wald(nn.Module):
         print(f"Test AUC-ROC: {auc_roc_value:.4f}")
 
 
-class Horizont(nn.Module):
+class SuperField(nn.Module):
     def __init__(self, num_models: int, num_layers: int, input_dim: int, hidden_dim: int, output_dim: int):
-        super(Horizont, self).__init__()
-        self.models = nn.ModuleList([Wald(num_layers, input_dim, hidden_dim, output_dim) for _ in range(num_models)])
+        super(SuperField, self).__init__()
+        self.models = nn.ModuleList([SuperForest(num_layers, input_dim, hidden_dim, output_dim) for _ in range(num_models)])
 
     def forward(self, x):
         outputs = []

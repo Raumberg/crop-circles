@@ -3,10 +3,12 @@ import torch.nn as nn
 import torch.optim as optim
 import numpy as np
 import pandas as pd
-from sklearn.metrics import roc_auc_score
+from sklearn.metrics import roc_auc_score, r2_score, mean_squared_error, mean_absolute_error
 
 from pandas import DataFrame, Series
 from typing import Tuple
+
+from lakes.aurora import Aurora
 
 try:
     import IPython
@@ -16,42 +18,77 @@ try:
         from tqdm import tqdm
 except (ImportError, NameError):
     from tqdm import tqdm
-
-from rich import print
-from rich.console import Console
-
 from tensorflow.keras.utils import Progbar
-
-console = Console()
 
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 if torch.cuda.is_available():
     torch.set_default_tensor_type(torch.cuda.FloatTensor)
     
-class Network(nn.Module):
-    def __init__(self, input_dim: int, hidden_dim_first: int, hidden_dim_second: int, output_dim: int):
+class Tarnn(nn.Module):
+    def __init__(self, 
+                input_dim: int, 
+                hidden_dim: int, 
+                output_dim: int, 
+                method: str = 'classification', 
+                dropout: bool = True, 
+                loss: str = 'bce',
+                aurora: bool = False,
+                shape: int = None
+                ):
         """
+        Temporal Abberated Reductant Neural Network [TARNN]
         Model initialization with the given parameters.
         """
-        super(Network, self).__init__()
+        super(Tarnn, self).__init__()
+        assert shape is not None, 'Please, provide the initial shape of X_train using X_train.shape[1]'
         self.relu = nn.ReLU()
         self.sigm = nn.Sigmoid()
         self.drop = nn.Dropout(0.2)
-        self.inp = nn.Linear(input_dim, hidden_dim_first)
-        self.lin = nn.Linear(hidden_dim_first, hidden_dim_second) 
-        self.out = nn.Linear(hidden_dim_second, output_dim)  
+        self.inp = nn.Linear(input_dim, hidden_dim)
+        self.lin = nn.Linear(hidden_dim, hidden_dim // 2) 
+        self.out = nn.Linear(hidden_dim // 2, output_dim)
+
+        self.method = method
+        self.use_dropout = dropout
+        self.loss_fn = self.set_loss(loss)
+
+        if aurora:
+            self.aurora = Aurora(input_dim=shape, learning_rate=0.01, output_dim=10)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
         Forward pass method
         """
-        x: torch.Tensor = self.relu(self.inp(x))
-        x: torch.Tensor = self.drop(x)
-        x: torch.Tensor = self.relu(self.lin(x))
-        x: torch.Tensor = self.sigm(self.out(x))
+        if hasattr(self, 'aurora'):
+            x_encoded = self.aurora.process(x)
+            x = x_encoded
+
+        x = self.relu(self.inp(x))
+
+        if self.use_dropout:
+            x = self.drop(x)
+
+        x = self.relu(self.lin(x))
+
+        if self.method == 'classification':
+            x = self.sigm(self.out(x))
+        else:
+            x = self.out(x)
+
         return x
     
+    def set_loss(self, loss):
+        match loss:
+            case 'bce': return nn.BCELoss()
+            case 'mse': return nn.MSELoss()
+            case 'l1': return nn.L1Loss()
+            case 'sl1': return nn.SmoothL1Loss()
+            case 'poisson': return nn.PoissonNLLLoss()
+            case 'gaussian': return nn.GaussianNLLLoss()
+            case 'kldiv': return nn.KLDivLoss()
+            case _: raise ValueError("Invalid loss. Available losses - 'bce', 'mse', 'l1', 'sl1', 'poisson', 'gaussian', 'kldiv'.")
+        
     def inject(self, 
             X_train: DataFrame | Series | np.ndarray, 
             y_train: DataFrame | Series | np.ndarray, 
@@ -60,6 +97,7 @@ class Network(nn.Module):
             learning_rate: float = 0.01,
             debug: bool = False,
             use_tqdm: bool = False,
+            clip_grads: bool = False,
             ) -> None:
         """
         Trains the neural network model on the given training data.
@@ -72,6 +110,7 @@ class Network(nn.Module):
             learning_rate (float, optional): The learning rate for the Adam optimizer. Defaults to 0.01.
             debug (bool, optional): Whether to print the gradients of the model during training. Defaults to False
             use_tqdm (bool, optional): Whether to use the tqdm progress bar during training. Defaults to False, using tensorflow's progress bar. 
+            clip_grads (bool, optional): Whether to clip gradient norms during the training phase. Defaults to False.
 
         Returns:
             None, just trains the model
@@ -83,55 +122,58 @@ class Network(nn.Module):
         X = torch.from_numpy(X_train.values if isinstance(X_train, (DataFrame | Series)) else X_train).float()
         y = torch.from_numpy(y_train.values if isinstance(y_train, (DataFrame | Series)) else y_train).float()
 
-        dataset = torch.utils.data.TensorDataset(X, y)
+        if hasattr(self, 'aurora'):
+            self.fit_aurora(tensor=X)
+            X_encoded = self.aurora.process(X, expect='encoded')
+            dataset = torch.utils.data.TensorDataset(X_encoded, y)
+        else:
+            print("Aurora is not enabled, skipping fitting..\n")
+            dataset = torch.utils.data.TensorDataset(X, y)
+
         data_loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
-        criterion = nn.BCELoss()
+        criterion = self.loss_fn
         optimizer = optim.Adam(self.parameters(), lr=learning_rate, amsgrad=True, weight_decay=0.01)
 
-        console.print(f"[bold][Neural Lake model][/bold]")
-        console.print(f"[bold green]| -> Device:[/bold green] {device}")
-        console.print(f"[bold green]| -> Epochs:[/bold green] {epochs}")
-        console.print(f"[bold green]| -> Batch Size:[/bold green] {batch_size}")
-        console.print(f"[bold green]| -> Learning Rate:[/bold green] {learning_rate}")
+        print(f"==================")
+        print(f"     [TAR/NN]")
+        print(f"==================")
+        print(f"| Configuration |")
+        print(f"| - Method: {self.method}")
+        print(f"| - Loss fn: {criterion}")
+        print(f"| - Device: {device}")
+        print(f"| - Epochs: {epochs}")
+        print(f"| - Batch Size: {batch_size}")
+        print(f"| - Learning Rate: {learning_rate}")
 
         for epoch in range(epochs):
             epoch_loss = 0
             if use_tqdm:
-                with tqdm(data_loader, 
-                desc=f'|Epoch {epoch+1}|', 
-                unit='batches', 
-                ) as pbar:
-                    for batch_X, batch_y in pbar:
-                        batch_y = batch_y.unsqueeze(-1)
-                        batch_X, batch_y = batch_X.to(device), batch_y.to(device)
-                        optimizer.zero_grad()
-                        outputs = self(batch_X)
-                        if debug:
-                            console.print(f"[bold]Grads tensor:[/bold] {outputs}")
-                        loss = criterion(outputs, batch_y)
-                        loss.backward()
-                        torch.nn.utils.clip_grad_norm_(self.parameters(), 1.0)
-                        optimizer.step()
-                        epoch_loss += loss.item()
-                        pbar.set_postfix({'loss': f'{loss.item():.4f}'})
+                pbar = tqdm(data_loader, desc=f'|Epoch {epoch+1}|', unit='batches')
             else:
-                progbar = Progbar(target=len(data_loader), width=30)
-                for batch_idx, (batch_X, batch_y) in enumerate(data_loader):
-                    batch_y = batch_y.unsqueeze(-1)
-                    batch_X, batch_y = batch_X.to(device), batch_y.to(device)
-                    optimizer.zero_grad()
-                    outputs = self(batch_X)
-                    if debug:
-                        console.print(f"[bold]Grads tensor:[/bold] {outputs}")
-                    loss = criterion(outputs, batch_y)
-                    loss.backward()
+                pbar = Progbar(target=len(data_loader), width=30)
+
+            for batch_idx, (batch_X, batch_y) in enumerate(data_loader):
+                # batch_y = batch_y.unsqueeze(-1)
+                batch_X, batch_y = batch_X.to(device), batch_y.to(device)
+                optimizer.zero_grad()
+                outputs = self(batch_X)
+                if debug:
+                    print(f"Grads: {outputs}")
+                loss = criterion(outputs, batch_y)
+                loss.backward()
+                if clip_grads:
                     torch.nn.utils.clip_grad_norm_(self.parameters(), 1.0)
-                    optimizer.step()
-                    epoch_loss += loss.item()
-                    progbar.update(batch_idx + 1, [("loss", loss.item())])
+                optimizer.step()
+                epoch_loss += loss.item()
+
+                if use_tqdm:
+                    pbar.update(1, [('loss', f'{loss.item():.4f}')])
+                else:
+                    pbar.update(batch_idx + 1, [("loss", loss.item())])
+
             avg_loss = epoch_loss / len(data_loader)
-            console.print(f"[bold][Epoch {epoch+1}] | Loss >>[/bold] {avg_loss:.4f}")
+            print(f"[Epoch {epoch+1}] | Loss >> {avg_loss:.4f}")
 
     def predict(self, 
                 X_test: DataFrame | Series | np.ndarray, 
@@ -148,8 +190,7 @@ class Network(nn.Module):
             proba (bool, optional): Whether to return probabilities instead of class labels. Defaults to False.
 
         Returns:
-            np.ndarray: The predicted labels or probabilities.
-
+            np.ndarray: The predicted labels or probabilities if method == 'classification', prediction values if method == 'regression'.
         """
         X = torch.from_numpy(X_test.values if isinstance(X_test, (DataFrame | Series)) else X_test).float()
 
@@ -161,23 +202,21 @@ class Network(nn.Module):
                 for i in range(0, len(X), batch_size):
                     batch_X = X[i:i+batch_size]
                     outputs = self(batch_X)
-                    all_outputs.append(outputs)
+                    if self.method == 'classification':
+                        all_outputs.append(torch.sigmoid(outputs))
+                    else:
+                        all_outputs.append(outputs)
 
             all_outputs = torch.cat(all_outputs)
-
         else:
             with torch.no_grad():
-                all_outputs = self(X)
+                all_outputs = self(X)   
+                if self.method == 'classification':
+                    all_outputs = torch.sigmoid(all_outputs)
+                else:
+                    all_outputs = self(X)
 
-        if proba:
-            return all_outputs.numpy()
-        else:
-            if len(all_outputs.shape) == 1:
-                predicted = (all_outputs > 0.5).int()
-            else:
-                predicted = torch.argmax(all_outputs, dim=1)
-
-            return predicted.numpy()
+        return all_outputs.numpy()
 
     def evaluate(self, 
                 X_test: DataFrame | Series | np.ndarray, 
@@ -194,13 +233,12 @@ class Network(nn.Module):
             use_batching (bool, optional): Whether to use batching during evaluation. Defaults to True.
 
         Returns:
-            float, float: The Accuracy and AUC/ROC score of the model on the test data.
+            float, float: The Accuracy and AUC/ROC score of the model on the test data if method == 'classification', MSE and MAE if method == 'regression'.
         """
         X = torch.from_numpy(X_test.values if isinstance(X_test, (DataFrame | Series)) else X_test).float()
         y = torch.from_numpy(y_test.values if isinstance(y_test, (DataFrame | Series)) else y_test).float()
 
         if use_batching:
-            total_correct = 0
             total_outputs = []
             total_labels = []
             with torch.no_grad():
@@ -211,24 +249,32 @@ class Network(nn.Module):
 
                     outputs = self(batch_X)
 
-                    predicted = (outputs > 0.5).int()
-
-                    total_correct += (predicted == batch_y.unsqueeze(-1)).sum().item()
                     total_outputs.extend(outputs.detach().numpy())
                     total_labels.extend(batch_y.numpy())
 
-            accuracy = total_correct / len(y_test)
-            auc_roc = roc_auc_score(total_labels, total_outputs)
+            if self.method == 'classification':
+                predicted = (torch.tensor(total_outputs) > 0.5).int()
+                accuracy = (predicted == torch.tensor(total_labels).unsqueeze(-1)).sum().item() / len(y_test)
+                auc_roc = roc_auc_score(total_labels, total_outputs)
+                return accuracy, auc_roc
+            else:
+                mse = mean_squared_error(total_labels, total_outputs)
+                mae = mean_absolute_error(total_labels, total_outputs)
+                return mse, mae
         else:
             with torch.no_grad():
                 self.eval()
                 outputs = self(X)
-                predicted = (outputs > 0.5).int()
 
+            if self.method == 'classification':
+                predicted = (outputs > 0.5).int()
                 accuracy = (predicted == y.unsqueeze(-1)).sum().item() / len(y_test)
                 auc_roc = roc_auc_score(y_test, outputs.detach().numpy())
-
-        return accuracy, auc_roc
+                return accuracy, auc_roc
+            else:
+                mse = mean_squared_error(y_test, outputs.detach().numpy())
+                mae = mean_absolute_error(y_test, outputs.detach().numpy())
+                return mse, mae
 
     def save(self, path: str) -> None:
         """
@@ -254,3 +300,21 @@ class Network(nn.Module):
         """
         self.load_state_dict(torch.load(path, map_location=torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')))
         self.eval()
+
+    def fit_aurora(self, tensor: torch.Tensor, epochs: int = 5, batch_size: int = 32):
+        self.aurora.inject(tensor=tensor, epochs=epochs, batch_size=batch_size)
+
+    def inspect_model(self):
+        print(self)
+
+    def inspect_parameters(self):
+        for name, param in self.named_parameters():
+            print(f"Parameter {name}, Shape: {param.shape}")
+
+    def inspect_weights(self):
+        for name, param in self.named_parameters():
+            print(f"Weight {name}, Shape: {param.shape}, Values: {param.data}")
+
+    def inspect_grads(self):
+        for name, param in self.named_parameters():
+            print(f"Gradient {name}, Shape: {param.shape}, Values: {param.grad.data}")

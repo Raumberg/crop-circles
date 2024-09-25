@@ -1,6 +1,8 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from torchinfo import summary
+
 import numpy as np
 import pandas as pd
 from sklearn.metrics import roc_auc_score, r2_score, mean_squared_error, mean_absolute_error
@@ -37,7 +39,7 @@ class Tarnn(nn.Module):
                 shape: int = None
                 ):
         """
-        Temporal Abberated Reductant Neural Network [TARNN]
+        Temporal Abberated Neural Differentiable Embedding Mechanism [TANDEM]
         Model initialization with the given parameters.
         """
         super(Tarnn, self).__init__()
@@ -48,6 +50,8 @@ class Tarnn(nn.Module):
         self.inp = nn.Linear(input_dim, hidden_dim)
         self.lin = nn.Linear(hidden_dim, hidden_dim // 2) 
         self.out = nn.Linear(hidden_dim // 2, output_dim)
+        self.bn1 = nn.BatchNorm1d(hidden_dim)
+        self.bn2 = nn.BatchNorm1d(hidden_dim // 2)
 
         self.method = method
         self.use_dropout = dropout
@@ -136,7 +140,7 @@ class Tarnn(nn.Module):
         optimizer = optim.Adam(self.parameters(), lr=learning_rate, amsgrad=True, weight_decay=0.01)
 
         print(f"==================")
-        print(f"     [TAR/NN]")
+        print(f"     [TANDEM]")
         print(f"==================")
         print(f"| Configuration |")
         print(f"| - Method: {self.method}")
@@ -145,6 +149,7 @@ class Tarnn(nn.Module):
         print(f"| - Epochs: {epochs}")
         print(f"| - Batch Size: {batch_size}")
         print(f"| - Learning Rate: {learning_rate}")
+        print(f" ---------------- ")
 
         for epoch in range(epochs):
             epoch_loss = 0
@@ -307,7 +312,7 @@ class Tarnn(nn.Module):
     def inspect_model(self):
         print(self)
 
-    def inspect_parameters(self):
+    def inspect_params(self):
         for name, param in self.named_parameters():
             print(f"Parameter {name}, Shape: {param.shape}")
 
@@ -318,3 +323,11 @@ class Tarnn(nn.Module):
     def inspect_grads(self):
         for name, param in self.named_parameters():
             print(f"Gradient {name}, Shape: {param.shape}, Values: {param.grad.data}")
+
+    @property
+    def parameters(self):
+        return sum(parameter.numel() for parameter in self.parameters if parameter.requires_grad)
+    
+    @property
+    def summary(self):
+        return summary(self)

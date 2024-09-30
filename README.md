@@ -2,30 +2,49 @@
 Pytorch based neural network for company's tabular data binary classification of clients who are willing or not willing to pay credit.  
 Not new, not hard, but working
 ### Contents:
-* *nn*       -> main neural network for binary classification
+* *tandem*       -> main neural network class
 * *riegel*   ->  embedding model for tabular categorical variables (with additional attention mechanism)
 * *aurora*   -> autoencoder model for tabular categorical variables, reducing dimentionality
-* *superforest* -> deep neural decision forest interpretation ()simplified)
+* *superforest* -> deep neural decision forest interpretation (simplified)
+* *data* -> dataminer helper class for manipulating dataframes
 
 ## Try learning yourself:
 **Note:**  
-This guideline only utilizes the main model Network, omitting abstract and aurora representations
+This guideline only utilizes the main model TANDEM, omitting aurora and riegel usage
 ```python
 # Obtain your dataset and perform train/test split, having
 # X_train, X_test, y_train and y_test
+# You can use DataMiner from data.py:
+from data import DataMiner
+
+df = pd.read_csv('..')
+miner = DataMiner(dataframe=df)
+X_train, X_test, y_train, y_test = miner.split(test_size=0.2, random_state=42, use_val=False) # you can use True boolean flag for use_val to create a validation set. in that case, you can also provide val_size
 # Don't forget to normalize data using, for example, StandardScaler()
 
-from net import Network
+from net import TANDEM
 
-net = Network(
+net = TANDEM(
   input_dim=X_train.shape[1],
-  hidden_dim_first=512,
-  hidden_dim_second=256,
-  output_dim=1
+  hidden_dim=512,
+  output_dim=1,
+  method='regression',
+  dropout=False,
+  loss='mse',
+  aurora=False
 )
-net.train(X_train, y_train)
-# Optionally you can pass batch_size, epochs
-# learning_rate and debug (to see tensors)
-# to the train method
-net.predict(X_test)
+net.inject(
+  X_train,
+  y_train,
+  batch_size=256,
+  epochs=50,
+  use_tqdm=False,
+  learning_rate=0.01,
+  clip_grads=False,
+  debug=False
+)
+preds = net.predict(X_test)
+net.save(path='../data/')
+net.inspect_model()
+net.params
 ```

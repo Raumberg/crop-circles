@@ -27,7 +27,7 @@ DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 if torch.cuda.is_available():
     torch.set_default_tensor_type(torch.cuda.FloatTensor)
     
-class Tarnn(nn.Module):
+class TANDEM(nn.Module):
     def __init__(self, 
                 input_dim: int, 
                 hidden_dim: int, 
@@ -42,7 +42,7 @@ class Tarnn(nn.Module):
         Temporal Abberated Neural Differentiable Embedding Mechanism [TANDEM]
         Model initialization with the given parameters.
         """
-        super(Tarnn, self).__init__()
+        super(TANDEM, self).__init__()
         assert shape is not None, 'Please, provide the initial shape of X_train using X_train.shape[1]'
         self.relu = nn.ReLU()
         self.sigm = nn.Sigmoid()

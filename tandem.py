@@ -325,7 +325,7 @@ class TANDEM(nn.Module):
             print(f"Gradient {name}, Shape: {param.shape}, Values: {param.grad.data}")
 
     @property
-    def parameters(self):
+    def params(self):
         return sum(parameter.numel() for parameter in self.parameters if parameter.requires_grad)
     
     @property

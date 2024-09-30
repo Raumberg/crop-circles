@@ -19,8 +19,9 @@ from data import DataMiner
 
 df = pd.read_csv('..')
 miner = DataMiner(dataframe=df)
-X_train, X_test, y_train, y_test = miner.split(test_size=0.2, random_state=42, use_val=False) # you can use True boolean flag for use_val to create a validation set. in that case, you can also provide val_size
-# Don't forget to normalize data using, for example, StandardScaler()
+X_train, X_test, y_train, y_test = miner.split(test_size=0.2, random_state=42, use_val=False)  
+# You can use <True> boolean flag for <use_val> to create a validation set.
+# In that case, you can also provide <val_size>
 
 from net import TANDEM
 

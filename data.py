@@ -607,27 +607,28 @@ class DataMiner:
 
         match method:
             case "iqr":
-                IQR = self.df.data[col].quantile(0.75) - self.df.data[col].quantile(0.25)
-                Upper_fence = self.df.data[col].quantile(0.75) + (IQR * threshold)
-                Lower_fence = self.df.data[col].quantile(0.25) - (IQR * threshold)
+                IQR = self.df[col].quantile(0.75) - self.df[col].quantile(0.25)
+                Upper_fence = self.df[col].quantile(0.75) + (IQR * threshold)
+                Lower_fence = self.df[col].quantile(0.25) - (IQR * threshold)
             case "std":
-                Upper_fence = self.df.data[col].mean() + threshold * self.df.data[col].std()
-                Lower_fence = self.df.data[col].mean() - threshold * self.df.data[col].std()
+                Upper_fence = self.df[col].mean() + threshold * self.df[col].std()
+                Lower_fence = self.df[col].mean() - threshold * self.df[col].std()
             case "mad":
-                median = self.df.data[col].median()
-                median_absolute_deviation = np.median([np.abs(y - median) for y in self.df.data[col]])
-                modified_z_scores = pd.Series([0.6745 * (y - median) / median_absolute_deviation for y in self.df.data[col]])
+                median = self.df[col].median()
+                median_absolute_deviation = np.median([np.abs(y - median) for y in self.df[col]])
+                modified_z_scores = pd.Series([0.6745 * (y - median) / median_absolute_deviation for y in self.df[col]])
                 outlier_index = np.abs(modified_z_scores) > threshold
-                print('Num of outlier detected:', outlier_index.value_counts()[1])
-                print('Proportion of outlier detected', outlier_index.value_counts()[1]/len(outlier_index))
-                return outlier_index, (median_absolute_deviation, median_absolute_deviation)
+                print('Num of outliers detected:', outlier_index.value_counts()[1])
+                print('Proportion of outliers detected', outlier_index.value_counts()[1]/len(outlier_index))
+                if rtrn:
+                    return outlier_index, (median_absolute_deviation, median_absolute_deviation)
             case _:
                 raise ValueError("Invalid method. Please choose 'IQR', 'STD', or 'MAD'.")
 
         para = (Upper_fence, Lower_fence)
-        tmp = pd.concat([self.df.data[col]>Upper_fence, self.df.data[col]<Lower_fence], axis=1)
+        tmp = pd.concat([self.df[col]>Upper_fence, self.df[col]<Lower_fence], axis=1)
         outlier_index = tmp.any(axis=1)
-        print('Num of outlier detected:', outlier_index.value_counts()[1])
-        print('Proportion of outlier detected', outlier_index.value_counts()[1]/len(outlier_index))
+        print('Num of outliers detected:', outlier_index.value_counts()[1])
+        print('Proportion of outliers detected', outlier_index.value_counts()[1]/len(outlier_index))
         if rtrn:
             return outlier_index, para

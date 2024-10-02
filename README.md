@@ -1,6 +1,5 @@
 # Network
-Pytorch based neural network for company's tabular data binary classification of clients who are willing or not willing to pay credit.  
-Not new, not hard, but working
+Pytorch based NN for tabular data problems.
 ### Contents:
 * *tandem*       -> main neural network class
 * *riegel*   ->  embedding model for tabular categorical variables (with additional attention mechanism)

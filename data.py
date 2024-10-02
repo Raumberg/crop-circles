@@ -26,8 +26,9 @@ from sklearn.metrics import precision_recall_fscore_support, mean_squared_error,
 from sklearn.utils import shuffle
 from sklearn.preprocessing import LabelEncoder
 from sklearn.model_selection import train_test_split, KFold
+from sklearn.preprocessing import StandardScaler, MinMaxScaler
 
-from typing import Dict, List, Tuple, Union
+from typing import Dict, List, Tuple, Union, Optional
 
 import time
 import gc
@@ -71,9 +72,9 @@ class DataWrapper:
 class DataMiner:
     def __init__(
         self,
-        dataframe: pd.DataFrame,
-        X: Union[pd.DataFrame, pd.Series],
-        y: Union[pd.DataFrame, pd.Series]
+        dataframe: pd.DataFrame = None,
+        X: Union[pd.DataFrame, pd.Series] = None,
+        y: Union[pd.DataFrame, pd.Series] = None
     ):
         """
         Initialize the DataMiner with a DataFrame, features, and target.
@@ -83,10 +84,9 @@ class DataMiner:
             X (Union[pd.DataFrame, pd.Series]): The features.
             y (Union[pd.DataFrame, pd.Series]): The target.
         """
-        if dataframe is None:
-            raise ValueError("DataFrame cannot be null")
-        self._check_df(dataframe)
-        self.df = DataWrapper(dataframe)
+        if dataframe is not None:
+            self._check_df(dataframe)
+            self.df = DataWrapper(dataframe)
         self.X = DataWrapper(X)
         self.y = y
 
@@ -145,7 +145,7 @@ class DataMiner:
         self.df = pd.concat([pd.DataFrame(self.X.data), pd.DataFrame(self.y[:, 0].tolist(), columns=['target'])], axis=1)
         return self
 
-    def concatenate_with(self, other: Union[pd.DataFrame, np.ndarray], attr: str = 'df', axis: int =  0) -> 'DataMiner':
+    def concatenate_with(self, other: pd.DataFrame | np.ndarray, attr: str = 'df', axis: int =  0) -> 'DataMiner':
         """
         Concatenate another DataFrame or array with the existing data.
 
@@ -523,3 +523,111 @@ class DataMiner:
         plt.xlim([0.0, 1.0])
         plt.title('Precision-Recall curve: Average Precision = %.4f' % (ap));
         plt.show()
+
+    
+    def drop_corr(self, thresh: float = 0.99, keep_cols: list = []):
+        """
+        Drop correlated columns with specified threshold
+
+        Args:
+            thresh (float): Threshold setup.
+            keep_cols (List, optional): What columns to keep. Defaults to an empty list.
+        """
+        df_corr = self.df.corr().abs()
+        upper = df_corr.where(np.triu(np.ones(df_corr.shape), k=1).astype(np.bool))
+        to_remove = [column for column in upper.columns if any(upper[column] > thresh)] ## Change to 99% for selection
+        to_remove = [x for x in to_remove if x not in keep_cols]
+        df_corr = df_corr.drop(columns = to_remove)
+        return self.df.drop(to_remove,axis=1)
+
+    def scale(self, 
+            train: bool = True, 
+            target: Optional[str] = None, 
+            cols_ignore: Optional[list[str]] = None, 
+            scaler: str = "std",
+            inplace: bool = False) -> Tuple[pd.DataFrame, Optional[StandardScaler | MinMaxScaler]]:
+        """
+        Scales the data in a DataFrame using a StandardScaler or MinMaxScaler.
+
+        Args:
+        - train (bool): Whether to fit the scaler to the data. Defaults to True.
+        - target (Optional[str]): The name of the target column. If None, all columns will be scaled.
+        - cols_ignore (Optional[list[str]]): A list of columns to ignore. If None, no columns will be ignored.
+        - scaler (str): The type of scaler to use. Can be "Standard" ('std') or "MinMax" ('minmax'). Defaults to "Standard".
+        - inplace: (bool, optional): Whether to modify dataframe inside the class or return a new one
+
+        Returns:
+        - Tuple[pd.DataFrame, Optional[StandardScaler | MinMaxScaler]]: A tuple containing the scaled DataFrame and the scaler.
+        """
+        scaler_types = {"std": StandardScaler, "minmax": MinMaxScaler}
+
+        if scaler not in scaler_types:
+            raise ValueError("Invalid type. Please choose 'std' or 'minmax'.")
+
+        scaler_class = scaler_types[scaler]
+        if train:
+            scaler_instance = scaler_class()
+            scaler_instance.fit(self.df.drop([target] if target else [], axis=1).values)
+
+        elif scaler_instance is None:
+            raise ValueError("Scaler must be provided when train is False.")
+
+        x_scaled = scaler_instance.transform(self.df.drop([target] if target else [], axis=1).values)
+
+        df_out = pd.DataFrame(x_scaled, index=self.df.index, columns=self.df.drop([target] if target else [], axis=1).columns)
+
+        if target:
+            df_out[target] = self.df[target]
+
+        if cols_ignore:
+            hold = self.df[cols_ignore].copy()
+            df_out = pd.concat((hold, df_out), axis=1)
+        
+        if inplace:
+            self.df = df_out
+        else:
+            if train:
+                return df_out, scaler
+            else:
+                return df_out
+        
+    def outliers(self, col: str, threshold: int = 3, method: str = "iqr", rtrn: bool = False) -> Tuple[pd.Series, Tuple]:
+        """
+        Detect outliers in a given column of the DataFrame.
+
+        Args:
+        - col (str): The column to detect outliers in.
+        - threshold (int, optional): The threshold to use for detecting outliers. Defaults to 3.
+        - method (str, optional): The method to use for detecting outliers. Can be "IQR", "STD", or "MAD". Defaults to "IQR".
+        - rtrn (bool, optional): Whether to return values
+
+        Returns:
+        - Tuple[pd.Series, Tuple]: A tuple containing a boolean Series indicating whether each data point is an outlier and a tuple containing the upper and lower fences (or the median absolute deviation and median for the MAD method).
+        """
+
+        match method:
+            case "iqr":
+                IQR = self.df.data[col].quantile(0.75) - self.df.data[col].quantile(0.25)
+                Upper_fence = self.df.data[col].quantile(0.75) + (IQR * threshold)
+                Lower_fence = self.df.data[col].quantile(0.25) - (IQR * threshold)
+            case "std":
+                Upper_fence = self.df.data[col].mean() + threshold * self.df.data[col].std()
+                Lower_fence = self.df.data[col].mean() - threshold * self.df.data[col].std()
+            case "mad":
+                median = self.df.data[col].median()
+                median_absolute_deviation = np.median([np.abs(y - median) for y in self.df.data[col]])
+                modified_z_scores = pd.Series([0.6745 * (y - median) / median_absolute_deviation for y in self.df.data[col]])
+                outlier_index = np.abs(modified_z_scores) > threshold
+                print('Num of outlier detected:', outlier_index.value_counts()[1])
+                print('Proportion of outlier detected', outlier_index.value_counts()[1]/len(outlier_index))
+                return outlier_index, (median_absolute_deviation, median_absolute_deviation)
+            case _:
+                raise ValueError("Invalid method. Please choose 'IQR', 'STD', or 'MAD'.")
+
+        para = (Upper_fence, Lower_fence)
+        tmp = pd.concat([self.df.data[col]>Upper_fence, self.df.data[col]<Lower_fence], axis=1)
+        outlier_index = tmp.any(axis=1)
+        print('Num of outlier detected:', outlier_index.value_counts()[1])
+        print('Proportion of outlier detected', outlier_index.value_counts()[1]/len(outlier_index))
+        if rtrn:
+            return outlier_index, para

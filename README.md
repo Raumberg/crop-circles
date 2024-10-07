@@ -1,11 +1,13 @@
-# Network
-Pytorch based NN for tabular data problems.
+# Crop Circles
+Pytorch based small deep learning library for tabular data problems.
 ### Contents:
-* *tandem*       -> main neural network class
-* *riegel*   ->  embedding model for tabular categorical variables (with additional attention mechanism)
-* *aurora*   -> autoencoder model for tabular categorical variables, reducing dimentionality
-* *superforest* -> deep neural decision forest interpretation (simplified)
+* *tandem*       -> small neural network based on perceptron for regression/classification
+* *riegel*   ->  deep model based on transformer with attention mechanisms, adapted from the latest
+deep tabular researches from arxiv.org
+* *aurora*   -> autoencoder model for tabular categorical variables, reducing dimentionality, a helper to tandem
+* *superforest* -> deep neural decision forest interpretation (simplified, unfinished)
 * *data* -> dataminer helper class for manipulating dataframes
+* *deeplib/* -> must-have modules for Riegel Ring, utility DL functions
 
 ## Try learning yourself:
 **Note:**  
@@ -48,3 +50,4 @@ net.save(path='../data/')
 net.inspect_model()
 net.params
 ```
+### A complete guideline with the use of Riegel Ring will be provided later

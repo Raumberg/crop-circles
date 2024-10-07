@@ -17,6 +17,9 @@ def attenuated_kaiming_uniform_(tensor, a=math.sqrt(5), scale=1., mode='fan_in',
     """
     Initializes a tensor using an attenuated Kaiming uniform distribution.
 
+    This initialization method is designed to keep the scale of the gradients
+    approximately the same in all layers, which helps in training deep networks.
+
     Args:
         tensor (Tensor): The tensor to initialize.
         a (float): The negative slope of the rectifier used after this layer (default: sqrt(5)).
@@ -85,7 +88,6 @@ class Tokenizer(nn.Module):
         self.bias = nn.Parameter(Tensor(d_bias, d_token)) if bias else None
         self.bias2 = nn.Parameter(Tensor(d_bias, d_token)) if bias else None
 
-        # v4
         attenuated_kaiming_uniform_(self.weight)
         attenuated_kaiming_uniform_(self.weight2)
         nn_init.kaiming_uniform_(self.bias, a=math.sqrt(5))
@@ -522,3 +524,44 @@ class RiegelRing(nn.Module):
         if mixup:
             return x, feat_masks, shuffled_ids
         return x
+
+    def _needs_wd(name):
+        return all(x not in name for x in ['tokenizer', '.norm', '.bias'])
+    
+    def setup(
+            self
+        ) -> None:
+        """
+        On review!
+        """
+        parameters_with_wd = [v for k, v in self.named_parameters() if self._needs_wd(k)]
+        parameters_without_wd = [v for k, v in self.named_parameters() if not self._needs_wd(k)]
+        params = [
+                {'params': parameters_with_wd},
+                {'params': parameters_without_wd, 'weight_decay': 0.0},
+        ]
+        self.loss_fn = torch.nn.BCEWithLogitsLoss()
+        self.optimizer = torch.optim.AdamW(params=params, lr=0.001)
+        return self
+    
+    def inject(
+            self,
+            loader: torch.utils.data.DataLoader,
+            epochs: int = 50,
+        ) -> None:
+        """
+        On review! 
+        """
+        if not hasattr(self, 'optimizer'):
+            self.setup()
+        for epoch in range(1, epochs):
+            self.train()
+            pbar = Progbar(target=len(loader), width=50)
+            for iteration, batch in enumerate(loader):
+                inputs, targets = batch
+                targets = targets.float().squeeze()
+                self.optimizer.zero_grad()
+                loss = self.loss_fn(self(batch), targets)
+                loss.backward()
+                self.optimizer.step()
+                pbar.update(iteration + 1, [("Loss", loss.item())])

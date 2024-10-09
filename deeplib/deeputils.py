@@ -50,14 +50,6 @@ class TaskType(enum.Enum):
         return self.value
 
 
-# class Timer(zero.Timer):
-#     @classmethod
-#     def launch(cls) -> 'Timer':
-#         timer = cls()
-#         timer.run()
-#         return timer
-
-
 def update_training_log(training_log, data, metrics):
     def _update(log_part, data_part):
         for k, v in data_part.items():
@@ -195,95 +187,6 @@ def get_device() -> torch.device:
 
 def _print_sep(c, size=100):
     print(c * size)
-
-
-# def start(
-#     config_cls: Type[T] = RawConfig,
-#     argv: Optional[List[str]] = None,
-#     patch_raw_config = None,
-# ) -> Tuple[T, Path, Report]:  # config  # output dir  # report
-#     parser = argparse.ArgumentParser()
-#     parser.add_argument('config', metavar='FILE')
-#     parser.add_argument('--force', action='store_true')
-#     parser.add_argument('--continue', action='store_true', dest='continue_')
-#     if argv is None:
-#         program = __main__.__file__
-#         args = parser.parse_args()
-#     else:
-#         program = argv[0]
-#         try:
-#             args = parser.parse_args(argv[1:])
-#         except Exception:
-#             print(
-#                 'Failed to parse `argv`.'
-#                 ' Remember that the first item of `argv` must be the path (relative to'
-#                 ' the project root) to the script/notebook.'
-#             )
-#             raise
-#     args = parser.parse_args(argv)
-
-#     snapshot_dir = os.environ.get('SNAPSHOT_PATH') # 存储训练到半路的情况
-#     if snapshot_dir and Path(snapshot_dir).joinpath('CHECKPOINTS_RESTORED').exists():
-#         assert args.continue_
-
-#     config_path = env.get_path(args.config)
-#     output_dir = config_path.with_suffix('')
-#     _print_sep('=')
-#     print(f'[output] {output_dir}')
-#     _print_sep('=')
-
-#     assert config_path.exists()
-#     raw_config = load_config(config_path)
-#     if patch_raw_config is not None:
-#         patch_raw_config(raw_config)
-#     if is_dataclass(config_cls):
-#         config = from_dict(config_cls, raw_config)
-#         full_raw_config = asdict(config)
-#     else:
-#         assert config_cls is dict
-#         full_raw_config = config = raw_config
-#     full_raw_config = asdict(config)
-
-#     if output_dir.exists():
-#         if args.force:
-#             print('Removing the existing output and creating a new one...')
-#             shutil.rmtree(output_dir)
-#             output_dir.mkdir()
-#         elif not args.continue_:
-#             backup_output(output_dir)
-#             print('The output directory already exists. Done!\n')
-#             sys.exit()
-#         elif output_dir.joinpath('DONE').exists():
-#             backup_output(output_dir)
-#             print('The "DONE" file already exists. Done!')
-#             sys.exit()
-#         else:
-#             print('Continuing with the existing output...')
-#     else:
-#         print('Creating the output...')
-#         output_dir.mkdir()
-
-#     report = {
-#         'program': str(env.get_relative_path(program)),
-#         'environment': {},
-#         'config': full_raw_config,
-#     }
-#     if torch.cuda.is_available():  # type: ignore[code]
-#         report['environment'].update(
-#             {
-#                 'CUDA_VISIBLE_DEVICES': os.environ.get('CUDA_VISIBLE_DEVICES'),
-#                 'gpus': zero.hardware.get_gpus_info(),
-#                 'torch.version.cuda': torch.version.cuda,  # type: ignore[code]
-#                 'torch.backends.cudnn.version()': torch.backends.cudnn.version(),  # type: ignore[code]
-#                 'torch.cuda.nccl.version()': torch.cuda.nccl.version(),  # type: ignore[code]
-#             }
-#         )
-#     dump_report(report, output_dir)
-#     dump_json(raw_config, output_dir / 'raw_config.json')
-#     _print_sep('-')
-#     pprint(full_raw_config, width=100)
-#     _print_sep('-')
-#     return cast(config_cls, config), output_dir, report
 
 
 _LAST_SNAPSHOT_TIME = None

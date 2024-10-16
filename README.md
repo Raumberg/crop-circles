@@ -8,7 +8,10 @@ deep tabular researches from arxiv.org
 * *aurora*   -> autoencoder model for tabular categorical variables, reducing dimentionality, a helper to tandem
 * *superforest* -> deep neural decision forest interpretation (simplified, unfinished)
 * *data* -> dataminer helper class for manipulating dataframes
-* *deeplib/* -> must-have modules for Riegel Ring, utility DL functions
+* *deeplib/* -> must-have modules for Riegel Ring, utility DL functions  
+  
+> [!IMPORTANT]
+> Please, feel free to contribute to the lib. Let's develop some useful models and tools together!
 
 ## Try learning yourself:
 **Note:**  

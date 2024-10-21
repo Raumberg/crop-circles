@@ -1,6 +1,6 @@
 # Crop Circles
-![Lib](crop-circles.jpg)
-Pytorch based small deep learning library for tabular data problems.
+![Lib](crop-circles.jpg)  
+## Pytorch based small deep learning library for tabular data problems.
 ### Contents:
 * *tandem*       -> small neural network based on perceptron for regression/classification
 * *riegel*   ->  deep model based on transformer with attention mechanisms, adapted from the latest

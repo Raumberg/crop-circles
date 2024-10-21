@@ -5,6 +5,7 @@ Pytorch based small deep learning library for tabular data problems.
 * *tandem*       -> small neural network based on perceptron for regression/classification
 * *riegel*   ->  deep model based on transformer with attention mechanisms, adapted from the latest
 deep tabular researches from arxiv.org
+* *abstract* -> deep abstract net (DANet) realization from arxiv.org
 * *aurora*   -> autoencoder model for tabular categorical variables, reducing dimentionality, a helper to tandem
 * *superforest* -> deep neural decision forest interpretation (simplified, unfinished)
 * *data* -> dataminer helper class for manipulating dataframes

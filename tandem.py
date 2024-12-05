@@ -29,7 +29,7 @@ DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 if torch.cuda.is_available():
     torch.set_default_tensor_type(torch.cuda.FloatTensor)
 
-def attenuated_kaiming_uniform_(tensor, a=math.sqrt(5), scale=1., mode='fan_in', nonlinearity='leaky_relu'):
+def attenuated_kaiming_uniform_(tensor, a=math.sqrt(5), scale=1., mode='fan_in', nonlinearity='relu'):
     """
     Initializes a tensor using an attenuated Kaiming uniform distribution.
 
@@ -41,7 +41,7 @@ def attenuated_kaiming_uniform_(tensor, a=math.sqrt(5), scale=1., mode='fan_in',
         a (float): The negative slope of the rectifier used after this layer (default: sqrt(5)).
         scale (float): Scaling factor for the standard deviation (default: 1.0).
         mode (str): Either 'fan_in' (default) or 'fan_out'.
-        nonlinearity (str): The non-linear function (default: 'leaky_relu').
+        nonlinearity (str): The non-linear function (default: 'relu').
 
     Returns:
         Tensor: The initialized tensor.
@@ -62,7 +62,9 @@ class TANDEM(nn.Module):
                 dropout: bool = True, 
                 loss: str = 'bce',
                 aurora: bool = False,
-                shape: int = None
+                shape: int = None,
+                weight_noise_std: float = 0.01,
+                gradient_noise_std: float = 0.01
                 ):
         """
         Temporal Abberated Neural Differentiable Embedding Mechanism [TANDEM]
@@ -72,7 +74,7 @@ class TANDEM(nn.Module):
         assert shape is not None, 'Please, provide the initial shape of X_train using X_train.shape[1]'
         self.relu = nn.ReLU()
         self.sigm = nn.Sigmoid()
-        self.drop = nn.Dropout(0.3)
+        self.drop = nn.Dropout(0.5)
         self.inp = nn.Linear(input_dim, hidden_dim)
         self.lin = nn.Linear(hidden_dim, hidden_dim // 2) 
         self.out = nn.Linear(hidden_dim // 2, output_dim)
@@ -92,6 +94,9 @@ class TANDEM(nn.Module):
                 self._attenuated_kaiming_uniform_(m.weight)
                 if m.bias is not None:
                     nn.init.zeros_(m.bias)  # Initialize biases to zero
+
+        self.weight_noise_std = weight_noise_std  # Initialize weight noise std
+        self.gradient_noise_std = gradient_noise_std  # Initialize gradient noise std        
 
     def _attenuated_kaiming_uniform_(self, tensor, a=math.sqrt(5), scale=1., mode='fan_in', nonlinearity='relu'):
         """

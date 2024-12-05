@@ -1,6 +1,8 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import torch.nn.init as nn_init  
+import math
 from torchinfo import summary
 
 import numpy as np
@@ -26,6 +28,30 @@ DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 if torch.cuda.is_available():
     torch.set_default_tensor_type(torch.cuda.FloatTensor)
+
+def attenuated_kaiming_uniform_(tensor, a=math.sqrt(5), scale=1., mode='fan_in', nonlinearity='leaky_relu'):
+    """
+    Initializes a tensor using an attenuated Kaiming uniform distribution.
+
+    This initialization method is designed to keep the scale of the gradients
+    approximately the same in all layers, which helps in training deep networks.
+
+    Args:
+        tensor (Tensor): The tensor to initialize.
+        a (float): The negative slope of the rectifier used after this layer (default: sqrt(5)).
+        scale (float): Scaling factor for the standard deviation (default: 1.0).
+        mode (str): Either 'fan_in' (default) or 'fan_out'.
+        nonlinearity (str): The non-linear function (default: 'leaky_relu').
+
+    Returns:
+        Tensor: The initialized tensor.
+    """
+    fan = nn_init._calculate_correct_fan(tensor, mode)
+    gain = nn_init.calculate_gain(nonlinearity, a)
+    std = gain * scale / math.sqrt(fan)
+    bound = math.sqrt(3.0) * std  # Calculate uniform bounds from standard deviation
+    with torch.no_grad():
+        return tensor.uniform_(-bound, bound)
     
 class TANDEM(nn.Module):
     def __init__(self, 
@@ -46,7 +72,7 @@ class TANDEM(nn.Module):
         assert shape is not None, 'Please, provide the initial shape of X_train using X_train.shape[1]'
         self.relu = nn.ReLU()
         self.sigm = nn.Sigmoid()
-        self.drop = nn.Dropout(0.2)
+        self.drop = nn.Dropout(0.3)
         self.inp = nn.Linear(input_dim, hidden_dim)
         self.lin = nn.Linear(hidden_dim, hidden_dim // 2) 
         self.out = nn.Linear(hidden_dim // 2, output_dim)
@@ -59,6 +85,36 @@ class TANDEM(nn.Module):
 
         if aurora:
             self.aurora = Aurora(input_dim=shape, learning_rate=0.01, output_dim=10)
+        
+        # Weight initialization
+        for m in self.modules():
+            if isinstance(m, nn.Linear):
+                self._attenuated_kaiming_uniform_(m.weight)
+                if m.bias is not None:
+                    nn.init.zeros_(m.bias)  # Initialize biases to zero
+
+    def _attenuated_kaiming_uniform_(self, tensor, a=math.sqrt(5), scale=1., mode='fan_in', nonlinearity='relu'):
+        """
+        Initializes a tensor using an attenuated Kaiming uniform distribution.
+        """
+        fan = nn_init._calculate_correct_fan(tensor, mode)
+        gain = nn_init.calculate_gain(nonlinearity, a)
+        std = gain * scale / math.sqrt(fan)
+        bound = math.sqrt(3.0) * std  # Calculate uniform bounds from standard deviation
+        with torch.no_grad():
+            return tensor.uniform_(-bound, bound)
+
+    def inject_weight_noise(self):
+        for param in self.parameters():
+            if param.requires_grad:
+                noise = torch.randn_like(param) * self.weight_noise_std
+                param.data += noise
+
+    def inject_gradient_noise(self):
+        for param in self.parameters():
+            if param.requires_grad and param.grad is not None:
+                noise = torch.randn_like(param.grad) * self.gradient_noise_std
+                param.grad += noise
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -68,12 +124,12 @@ class TANDEM(nn.Module):
             x_encoded = self.aurora.process(x)
             x = x_encoded
 
-        x = self.relu(self.inp(x))
+        x = self.relu(self.bn1(self.inp(x)))
 
         if self.use_dropout:
             x = self.drop(x)
 
-        x = self.relu(self.lin(x))
+        x = self.relu(self.bn2(self.lin(x)))
 
         if self.method == 'classification':
             x = self.sigm(self.out(x))
@@ -159,7 +215,7 @@ class TANDEM(nn.Module):
                 pbar = Progbar(target=len(data_loader), width=30)
 
             for batch_idx, (batch_X, batch_y) in enumerate(data_loader):
-                # batch_y = batch_y.unsqueeze(-1)
+                batch_y = batch_y.unsqueeze(-1)
                 batch_X, batch_y = batch_X.to(device), batch_y.to(device)
                 optimizer.zero_grad()
                 outputs = self(batch_X)
@@ -169,7 +225,15 @@ class TANDEM(nn.Module):
                 loss.backward()
                 if clip_grads:
                     torch.nn.utils.clip_grad_norm_(self.parameters(), 1.0)
+                
+                # Inject gradient noise before the optimizer step
+                self.inject_gradient_noise()
+                
                 optimizer.step()
+
+                # Inject weight noise after the optimizer step
+                self.inject_weight_noise()
+
                 epoch_loss += loss.item()
 
                 if use_tqdm:

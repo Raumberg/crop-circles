@@ -69,17 +69,23 @@ class Aurora(nn.Module):
         print(f"[OUTPUT DIM] >> {self.output_dim}")
 
         data_loader = DataLoader(AuroraSet(tensor), batch_size=batch_size, shuffle=True)
+
+        self.train()
+        
         for epoch in range(epochs):
+            total_loss = 0
             pbar = Progbar(target=len(data_loader), width=30)
-            for i, batch in enumerate(data_loader):
+            for i, batch in enumerate(pbar):
                 batch = batch.float()
                 self.optimizer.zero_grad()
                 outputs = self(batch)
                 loss = self.criterion(outputs, batch)
                 loss.backward()
                 self.optimizer.step()
+                total_loss += loss.item()
                 pbar.update(i + 1, values=[("Loss", loss.item())])
-            print(f'[Epoch {epoch+1}] | Loss: {loss.item():.4f}')
+            avg_loss = total_loss / len(data_loader)
+            print(f'[Epoch {epoch+1}] | Loss: {avg_loss:.4f}')
 
     def process(self, data: np.ndarray | torch.Tensor, printable: bool = False, expect: str = 'decoded') -> torch.Tensor:
         encoded_data = self.encoder(torch.from_numpy(data).float() if isinstance(data, np.ndarray) else data)

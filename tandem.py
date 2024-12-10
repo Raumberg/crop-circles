@@ -212,6 +212,8 @@ class TANDEM(nn.Module):
         print(f"| - Learning Rate: {learning_rate}")
         print(f" ---------------- ")
 
+        self.train()
+                
         for epoch in range(epochs):
             epoch_loss = 0
             if use_tqdm:

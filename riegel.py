@@ -59,17 +59,6 @@ class Tokenizer(nn.Module):
         d_token: int,
         bias: bool,
     ) -> None:
-        """
-        Multihead attention module.
-
-        Attributes:
-            W_q (nn.Linear): Query projection layer.
-            W_k (nn.Linear): Key projection layer.
-            W_v (nn.Linear): Value projection layer.
-            W_out (nn.Linear): Output projection layer (optional).
-            n_heads (int): Number of attention heads.
-            dropout (nn.Dropout): Dropout layer (optional).
-        """
         super().__init__()
         if categories is None:
             d_bias = d_numerical

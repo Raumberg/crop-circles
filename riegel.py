@@ -1,3 +1,7 @@
+# Inspired and based on arxiv article "ExcelFormer: A neural network surpassing GBDTs on tabular data"
+# by Jintai Chen, Jiahuan Yan, Qiyuan Chen, Danny Z. Chen, Jian Wu and Jimeng Sun
+# Link: https://arxiv.org/pdf/2301.02819
+
 import math
 import typing as ty
 from pathlib import Path

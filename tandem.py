@@ -1,3 +1,7 @@
+# Inspired and based on arxiv article "Well-tuned Simple Nets Excel on Tabular Datasets"
+# by Arlind Kadra, Marius Lindauer, Frank Hutter and Josif Grabocka
+# Link: https://arxiv.org/pdf/2106.11189
+
 import torch
 import torch.nn as nn
 import torch.optim as optim

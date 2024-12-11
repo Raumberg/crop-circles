@@ -1,3 +1,7 @@
+# Based on arxiv article "DANETs: Deep Abstract Networks for Tabular Data Classification and Regression"
+# by Jintai Chen, Kuanlun Liao, Yao Wan, Danny Z. Chen and Jian Wu
+# Link: https://arxiv.org/pdf/2112.02962
+
 import torch
 import torch.nn as nn
 import numpy as np

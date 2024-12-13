@@ -18,67 +18,37 @@ from typing import Tuple
 
 from lakes.aurora import Aurora
 
-try:
-    import IPython
-    if IPython.get_ipython().__class__.__name__ == 'ZMQInteractiveShell':
-        from tqdm.notebook import tqdm
-    else:
-        from tqdm import tqdm
-except (ImportError, NameError):
-    from tqdm import tqdm
 from tensorflow.keras.utils import Progbar
 
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
 if torch.cuda.is_available():
     torch.set_default_tensor_type(torch.cuda.FloatTensor)
 
-def attenuated_kaiming_uniform_(tensor, a=math.sqrt(5), scale=1., mode='fan_in', nonlinearity='relu'):
-    """
-    Initializes a tensor using an attenuated Kaiming uniform distribution.
+print(f"[Module imported. Init device: {DEVICE}]")
 
-    This initialization method is designed to keep the scale of the gradients
-    approximately the same in all layers, which helps in training deep networks.
 
-    Args:
-        tensor (Tensor): The tensor to initialize.
-        a (float): The negative slope of the rectifier used after this layer (default: sqrt(5)).
-        scale (float): Scaling factor for the standard deviation (default: 1.0).
-        mode (str): Either 'fan_in' (default) or 'fan_out'.
-        nonlinearity (str): The non-linear function (default: 'relu').
-
-    Returns:
-        Tensor: The initialized tensor.
-    """
-    fan = nn_init._calculate_correct_fan(tensor, mode)
-    gain = nn_init.calculate_gain(nonlinearity, a)
-    std = gain * scale / math.sqrt(fan)
-    bound = math.sqrt(3.0) * std  # Calculate uniform bounds from standard deviation
-    with torch.no_grad():
-        return tensor.uniform_(-bound, bound)
-    
 class TANDEM(nn.Module):
     def __init__(self, 
                 input_dim: int, 
                 hidden_dim: int, 
                 output_dim: int, 
                 method: str = 'classification', 
-                dropout: bool = True, 
+                dropout: float = 0.0, 
                 loss: str = 'bce',
                 aurora: bool = False,
                 shape: int = None,
-                weight_noise_std: float = 0.01,
-                gradient_noise_std: float = 0.01
+                weight_noise_std: float = 0.0,
+                gradient_noise_std: float = 0.0
                 ):
         """
         Temporal Abberated Neural Differentiable Embedding Mechanism [TANDEM]
         Model initialization with the given parameters.
         """
         super(TANDEM, self).__init__()
-        assert shape is not None, 'Please, provide the initial shape of X_train using X_train.shape[1]'
+        assert input_dim is not None, 'Please, provide the initial shape of X_train using X_train.shape[1]'
         self.relu = nn.ReLU()
         self.sigm = nn.Sigmoid()
-        self.drop = nn.Dropout(0.5)
+        self.drop = nn.Dropout(dropout)
         self.inp = nn.Linear(input_dim, hidden_dim)
         self.lin = nn.Linear(hidden_dim, hidden_dim // 2) 
         self.out = nn.Linear(hidden_dim // 2, output_dim)
@@ -114,12 +84,18 @@ class TANDEM(nn.Module):
             return tensor.uniform_(-bound, bound)
 
     def inject_weight_noise(self):
+        """
+        Injection of weight noise to weight params according to std provided
+        """
         for param in self.parameters():
             if param.requires_grad:
                 noise = torch.randn_like(param) * self.weight_noise_std
                 param.data += noise
 
     def inject_gradient_noise(self):
+        """
+        Injection of grad noise to grad params according to std provided
+        """
         for param in self.parameters():
             if param.requires_grad and param.grad is not None:
                 noise = torch.randn_like(param.grad) * self.gradient_noise_std
@@ -132,24 +108,15 @@ class TANDEM(nn.Module):
         if hasattr(self, 'aurora'):
             x_encoded = self.aurora.process(x)
             x = x_encoded
-
         x = self.relu(self.bn1(self.inp(x)))
-
-        if self.use_dropout:
-            x = self.drop(x)
-
+        x = self.drop(x)
         x = self.relu(self.bn2(self.lin(x)))
-
-        if self.method == 'classification':
-            x = self.sigm(self.out(x))
-        else:
-            x = self.out(x)
-
+        x = self.out(x)
         return x
     
     def set_loss(self, loss):
         match loss:
-            case 'bce': return nn.BCELoss()
+            case 'bce': return nn.BCEWithLogitsLoss()
             case 'mse': return nn.MSELoss()
             case 'l1': return nn.L1Loss()
             case 'sl1': return nn.SmoothL1Loss()
@@ -165,7 +132,6 @@ class TANDEM(nn.Module):
             batch_size: int = 32, 
             learning_rate: float = 0.01,
             debug: bool = False,
-            use_tqdm: bool = False,
             clip_grads: bool = False,
             ) -> None:
         """
@@ -184,9 +150,7 @@ class TANDEM(nn.Module):
         Returns:
             None, just trains the model
         """
-        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-        self.to(device)
-        self.train()
+        self.to(DEVICE)
 
         X = torch.from_numpy(X_train.values if isinstance(X_train, (DataFrame | Series)) else X_train).float()
         y = torch.from_numpy(y_train.values if isinstance(y_train, (DataFrame | Series)) else y_train).float()
@@ -217,14 +181,10 @@ class TANDEM(nn.Module):
         print(f" ---------------- ")
 
         self.train()
-                
+
         for epoch in range(epochs):
             epoch_loss = 0
-            if use_tqdm:
-                pbar = tqdm(data_loader, desc=f'|Epoch {epoch+1}|', unit='batches')
-            else:
-                pbar = Progbar(target=len(data_loader), width=30)
-
+            pbar = Progbar(target=len(data_loader), width=30)
             for batch_idx, (batch_X, batch_y) in enumerate(data_loader):
                 batch_y = batch_y.unsqueeze(-1)
                 batch_X, batch_y = batch_X.to(device), batch_y.to(device)
@@ -236,21 +196,13 @@ class TANDEM(nn.Module):
                 loss.backward()
                 if clip_grads:
                     torch.nn.utils.clip_grad_norm_(self.parameters(), 1.0)
-                
-                # Inject gradient noise before the optimizer step
-                self.inject_gradient_noise()
-                
-                optimizer.step()
 
-                # Inject weight noise after the optimizer step
+                self.inject_gradient_noise()
+                optimizer.step()
                 self.inject_weight_noise()
 
                 epoch_loss += loss.item()
-
-                if use_tqdm:
-                    pbar.update(1, [('loss', f'{loss.item():.4f}')])
-                else:
-                    pbar.update(batch_idx + 1, [("loss", loss.item())])
+                pbar.update(batch_idx + 1, [("loss", loss.item())])
 
             avg_loss = epoch_loss / len(data_loader)
             print(f"[Epoch {epoch+1}] | Loss >> {avg_loss:.4f}")

@@ -405,6 +405,7 @@ class RiegelRing(nn.Module):
             try:
                 import horovod.torch as hvd
                 self.hvd = hvd
+                torch.cuda.set_device(hvd.local_rank())
             except ImportError:
                 raise ImportError("Horovod is not installed. Please install it to use distributed training.")
 

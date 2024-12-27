@@ -19,7 +19,7 @@
 
 ## 🚀 Features
 - **PyTorch based**: The library is based on pure PyTorch with utilities, layers and data manipulation.
-- **Researches**: All deep models inspired by articles on tabular data from arxiv.org
+- **Researches**: All deep models are inspired by articles on tabular data from arxiv.org
 - **Tabular problems**: The library is attempting to solve tabular data problems applying deep approaches surpassing regular GBDTs (Gradient Boosted Desicion Trees).
 - **Data manipulation**: The library includes a set of utilities to manipulate data, including data augmentation, data preparation and so on.
 - **Model selection**: The library includes a set of models that can be used to solve various problems.
@@ -36,4 +36,3 @@
 
 > [!IMPORTANT]
 > Please, feel free to contribute to the lib. Let's develop some useful models and tools together! My contacts are in my profile
-

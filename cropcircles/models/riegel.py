@@ -400,6 +400,7 @@ class RiegelRing(nn.Module):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         print(f"Device available: {self.device}")
 
+        self.horovod = horovod
         if self.horovod:
             try:
                 import horovod.torch as hvd
@@ -615,7 +616,7 @@ class RiegelRing(nn.Module):
         self.optimizer = torch.optim.AdamW(params=params, lr=lr)
 
         # Wrapping the optimizer with Horovod if enabled
-        if self.use_horovod:
+        if self.horovod:
             self.optimizer = hvd.DistributedOptimizer(self.optimizer, named_parameters=self.named_parameters())
         return self
     
@@ -655,6 +656,6 @@ class RiegelRing(nn.Module):
                     self.scheduler.step()
 
                 if iteration % 10 == 0 and hvd.rank() == 0 and self.horovod:
-                    print(f'Train Epoch: {epoch} [{iteration * len(train_loader)}/{len(train_loader)}] Loss: {loss.item():.6f}')
+                    print(f'Epoch: [{epoch}] Loss: {loss.item():.6f}')
 
                 pbar.update(iteration + 1, [("Loss", loss.cpu().item())])

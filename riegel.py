@@ -11,11 +11,19 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.nn.init as nn_init
+import torch.optim as optim
 from torch import Tensor
+import torch.utils.data.dataloader
 
-import deeplib as lib
-from deeplib import deepmodules as dm
-from deeplib import augmentations as aug
+import horovod.torch as hvd # horovod.parallel on cluster
+
+from tensorflow.keras.utils import Progbar
+
+from typing import Optional, Dict, Any, List, Tuple
+
+import lakes.riegel.deeplib as lib
+from lakes.riegel.deeplib import deepmodules as dm
+from lakes.riegel.deeplib import augmentations as aug
 
 def attenuated_kaiming_uniform_(tensor, a=math.sqrt(5), scale=1., mode='fan_in', nonlinearity='leaky_relu'):
     """
@@ -81,6 +89,7 @@ class Tokenizer(nn.Module):
         self.bias = nn.Parameter(Tensor(d_bias, d_token)) if bias else None
         self.bias2 = nn.Parameter(Tensor(d_bias, d_token)) if bias else None
 
+        # v4
         attenuated_kaiming_uniform_(self.weight)
         attenuated_kaiming_uniform_(self.weight2)
         nn_init.kaiming_uniform_(self.bias, a=math.sqrt(5))
@@ -289,6 +298,7 @@ class RiegelRing(nn.Module):
         #
         d_out: int,
         init_scale: float = 0.1,
+        horovod: bool = False
     ) -> None:
         """
         Initializes the RiegelRing module.
@@ -386,7 +396,16 @@ class RiegelRing(nn.Module):
         # self.last_fc = nn.Linear(d_numerical, 1)
         attenuated_kaiming_uniform_(self.last_fc.weight)
         # nn_init.zeros_(self.last_fc.bias)
-        
+
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        print(f"Device available: {self.device}")
+
+        if self.horovod:
+            try:
+                import horovod.torch as hvd
+                self.hvd = hvd
+            except ImportError:
+                raise ImportError("Horovod is not installed. Please install it to use distributed training.")
 
     def _get_kv_compressions(self, layer):
         """
@@ -517,12 +536,62 @@ class RiegelRing(nn.Module):
         if mixup:
             return x, feat_masks, shuffled_ids
         return x
-
+    
     def _needs_wd(name):
         return all(x not in name for x in ['tokenizer', '.norm', '.bias'])
     
+    @staticmethod
+    def set_optim(
+            optimizer: str,
+            parameter_groups,
+            lr: float,
+            weight_decay: float,
+        ) -> optim.Optimizer:
+        Optimizer = {
+            'adam': optim.Adam,
+            'adamw': optim.AdamW,
+            'sgd': optim.SGD,
+        }[optimizer]
+        momentum = (0.9,) if Optimizer is optim.SGD else ()
+        return Optimizer(parameter_groups, lr, *momentum, weight_decay=weight_decay)
+    
+    @staticmethod
+    def set_lr(
+            optimizer: optim.Optimizer,
+            lr: float,
+            epoch_size: int,
+            lr_schedule: Optional[Dict[str, Any]],
+        ) -> Tuple[
+            Optional[optim.lr_scheduler._LRScheduler],
+            Dict[str, Any],
+            Optional[int],
+        ]:
+        if lr_schedule is None:
+            lr_schedule = {'type': 'constant'}
+        lr_scheduler = None
+        n_warmup_steps = None
+        if lr_schedule['type'] in ['transformer', 'linear_warmup']:
+            n_warmup_steps = (
+                lr_schedule['n_warmup_steps']
+                if 'n_warmup_steps' in lr_schedule
+                else lr_schedule['n_warmup_epochs'] * epoch_size
+            )
+        elif lr_schedule['type'] == 'cyclic':
+            lr_scheduler = optim.lr_scheduler.CyclicLR(
+                optimizer,
+                base_lr=lr,
+                max_lr=lr_schedule['max_lr'],
+                step_size_up=lr_schedule['n_epochs_up'] * epoch_size,
+                step_size_down=lr_schedule['n_epochs_down'] * epoch_size,
+                mode=lr_schedule['mode'],
+                gamma=lr_schedule.get('gamma', 1.0),
+                cycle_momentum=False,
+            )
+        return lr_scheduler, lr_schedule, n_warmup_steps
+
     def setup(
-            self
+            self,
+            # training_args: dict
         ) -> None:
         """
         On review!
@@ -533,28 +602,59 @@ class RiegelRing(nn.Module):
                 {'params': parameters_with_wd},
                 {'params': parameters_without_wd, 'weight_decay': 0.0},
         ]
+        # optimizer, scheduler = self.set_optim(self, training_args)
+
+        # Setting up horovod.parallel
+        if self.horovod:
+            hvd.init()
+
+        # Setting and scaling up learning rate based on the n workers
+        lr = 0.001 * (hvd.size() if self.horovod else 1)
+
         self.loss_fn = torch.nn.BCEWithLogitsLoss()
-        self.optimizer = torch.optim.AdamW(params=params, lr=0.001)
+        self.optimizer = torch.optim.AdamW(params=params, lr=lr)
+
+        # Wrapping the optimizer with Horovod if enabled
+        if self.use_horovod:
+            self.optimizer = hvd.DistributedOptimizer(self.optimizer, named_parameters=self.named_parameters())
         return self
     
     def inject(
             self,
-            loader: torch.utils.data.DataLoader,
+            train_loader: torch.utils.data.DataLoader,
+            eval_loader: torch.utils.data.DataLoader,
             epochs: int = 50,
         ) -> None:
         """
         On review! 
         """
+        self.to(self.device)
+
         if not hasattr(self, 'optimizer'):
             self.setup()
+
+        if self.horovod:
+            hvd.broadcast_parameters(self.state_dict(), root_rank=0)
+            hvd.broadcast_optimizer_state(self.optimizer, root_rank=0)
+        
+        self.train()
         for epoch in range(1, epochs):
-            self.train()
-            pbar = Progbar(target=len(loader), width=50)
-            for iteration, batch in enumerate(loader):
+            pbar = Progbar(target=len(train_loader), width=50)
+            for iteration, batch in enumerate(train_loader):
                 inputs, targets = batch
-                targets = targets.float().squeeze()
+
+                inputs = inputs.to(self.device)
+                targets = targets.float().squeeze().to(self.device)
+
                 self.optimizer.zero_grad()
-                loss = self.loss_fn(self(batch), targets)
+                loss = self.loss_fn(self(inputs), targets) #self(batch), targets
                 loss.backward()
                 self.optimizer.step()
-                pbar.update(iteration + 1, [("Loss", loss.item())])
+
+                if self.scheduler is not None: # TODO: add scheduler to class
+                    self.scheduler.step()
+
+                if iteration % 10 == 0 and hvd.rank() == 0 and self.horovod:
+                    print(f'Train Epoch: {epoch} [{iteration * len(train_loader)}/{len(train_loader)}] Loss: {loss.item():.6f}')
+
+                pbar.update(iteration + 1, [("Loss", loss.cpu().item())])

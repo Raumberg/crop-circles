@@ -1,16 +1,21 @@
-<h1 align="center"> CROP CIRCLES  </h1>
+<div align="center">
+  <h1 style="background: linear-gradient(to right, black, white); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin: 0;">
+        CROP CIRCLES
+    </h1>
+    <div style="border: 10px solid; border-image: linear-gradient(to right, black, white) 1; padding: 10px; display: inline-block;">
+        <img src="assets/crop-circles-compressed.jpg" alt="gallery" width="500"/>
+    </div>
+    <br>
+    <br>
+    <p align="center">
+        <img src="https://img.shields.io/github/issues/Raumberg/crop-circles?style=for-the-badge">
+        <br>
+        <img src="https://img.shields.io/github/languages/count/Raumberg/crop-circles?style=for-the-badge">
+        <img src="https://img.shields.io/github/repo-size/Raumberg/crop-circles?style=for-the-badge">
+        <br>
+    </p>
+</div>
 
-</br>
-<p align="center">
-  <img src="https://img.shields.io/github/issues/Raumberg/crop-circles?style=for-the-badge">
-  </br>
-  <img src="https://img.shields.io/github/languages/count/Raumberg/crop-circles?style=for-the-badge">
-  <img src="https://img.shields.io/github/repo-size/Raumberg/crop-circles?style=for-the-badge">
-  </br>
-</p>
-
-## Deep Learning Library
-![gallery](assets/crop-circles-compressed.jpg)
 
 ## 🚀 Features
 - **PyTorch based**: The library is based on pure PyTorch with utilities, layers and data manipulation.

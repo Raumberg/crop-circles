@@ -9,12 +9,12 @@ import numpy as np
 import torch
 from tabulate import tabulate
 
-__all__ = ["collect_env", "set_random_seed", "symlink"]
+__all__ = ["environment", "set_random_seed", "symlink"]
 
 logger = logging.getLogger(__name__)
 
 
-def collect_env() -> str:
+def environment() -> str:
     """Collect the information of the running environments.
 
     The following information are contained.
@@ -62,7 +62,6 @@ def collect_env() -> str:
 
     return tabulate(env_info)
 
-
 def set_random_seed(seed: Optional[int] = None, deterministic: bool = False) -> None:
     """Set random seed.
 
@@ -84,7 +83,6 @@ def set_random_seed(seed: Optional[int] = None, deterministic: bool = False) -> 
         torch.backends.cudnn.deterministic = True
         logger.info("The CUDNN is set to deterministic. This will increase reproducibility, "
                     "but may slow down your training considerably.")
-
 
 def symlink(src: str, dst: str, overwrite: bool = True, **kwargs) -> None:
     """Create a symlink, dst -> src.

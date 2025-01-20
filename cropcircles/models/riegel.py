@@ -21,9 +21,9 @@ from tensorflow.keras.utils import Progbar
 
 from typing import Optional, Dict, Any, List, Tuple
 
-import lakes.riegel.deeplib as lib
-from lakes.riegel.deeplib import deepmodules as dm
-from lakes.riegel.deeplib import augmentations as aug
+# import ..deeplib as lib
+from ..deeplib.deepmodules.activations import get_activation_fn
+from ..deeplib import augmentations as aug
 
 def attenuated_kaiming_uniform_(tensor, a=math.sqrt(5), scale=1., mode='fan_in', nonlinearity='leaky_relu'):
     """
@@ -126,8 +126,6 @@ class Tokenizer(nn.Module):
         # print(x2)
         # print(x2.shape)
         return x1 * torch.tanh(x2)
-
-
 
 class MultiheadAttention(nn.Module):
     """
@@ -381,7 +379,7 @@ class RiegelRing(nn.Module):
                     assert kv_compression_sharing == 'key-value'
             self.layers.append(layer)
 
-        self.activation = dm.get_activation_fn('tanglu')
+        self.activation = get_activation_fn('tanglu')
         self.last_activation = nn.PReLU()
         self.prenormalization = prenormalization
         self.last_normalization = make_normalization() if prenormalization else None

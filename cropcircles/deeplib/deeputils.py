@@ -31,6 +31,8 @@ RawConfig = Dict[str, Any]
 Report = Dict[str, Any]
 T = TypeVar('T')
 
+_CONFIG_NONE = '__none__'
+_LAST_SNAPSHOT_TIME = None
 
 class Part(enum.Enum):
     TRAIN = 'train'
@@ -39,16 +41,6 @@ class Part(enum.Enum):
 
     def __str__(self) -> str:
         return self.value
-
-
-class TaskType(enum.Enum):
-    BINCLASS = 'binclass'
-    MULTICLASS = 'multiclass'
-    REGRESSION = 'regression'
-
-    def __str__(self) -> str:
-        return self.value
-
 
 def update_training_log(training_log, data, metrics):
     def _update(log_part, data_part):
@@ -84,7 +76,6 @@ def _replace(data, condition, value):
     return do(data)
 
 
-_CONFIG_NONE = '__none__'
 
 
 def unpack_config(config: RawConfig) -> RawConfig:
@@ -189,7 +180,6 @@ def _print_sep(c, size=100):
     print(c * size)
 
 
-_LAST_SNAPSHOT_TIME = None
 
 
 def backup_output(output_dir: Path) -> None:

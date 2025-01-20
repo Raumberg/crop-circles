@@ -18,8 +18,8 @@ from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import StandardScaler
 
 from . import env, util
-from .metrics import calculate_metrics as calculate_metrics_
-from .util import TaskType
+from deepmetrics import Metrica, TaskType
+# from deepmetrics import calculate_metrics as calculate_metrics_
 
 ArrayDict = Dict[str, np.ndarray]
 TensorDict = Dict[str, torch.Tensor]
@@ -85,7 +85,7 @@ class Dataset:
 
     @property
     def is_binclass(self) -> bool:
-        return self.task_type == TaskType.BINCLASS
+        return self.task_type == TaskType.BINARY
 
     @property
     def is_multiclass(self) -> bool:
@@ -127,7 +127,7 @@ class Dataset:
         prediction_type: Optional[str],
     ) -> Dict[str, Any]:
         metrics = {
-            x: calculate_metrics_(
+            x: Metrica.calculate_metrics(
                 self.y[x], predictions[x], self.task_type, prediction_type, self.y_info
             )
             for x in predictions

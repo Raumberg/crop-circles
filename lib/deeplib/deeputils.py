@@ -121,7 +121,6 @@ def load(path: Union[Path, str], **kwargs) -> Any:
 def dump(x: Any, path: Union[Path, str], **kwargs) -> Any:
     return globals()[f'dump_{Path(path).suffix[1:]}'](x, Path(path), **kwargs)
 
-
 def _get_output_item_path(
     path: Union[str, Path], filename: str, must_exist: bool
 ) -> Path:
@@ -136,7 +135,6 @@ def _get_output_item_path(
     if must_exist:
         assert path.exists()
     return path
-
 
 def load_report(path: Path) -> Report:
     return load_json(_get_output_item_path(path, 'report.json', True))

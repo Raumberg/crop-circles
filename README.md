@@ -34,5 +34,15 @@
 * *utils*: Data preparation tools (without digging deep)
 * *parallel.sh*: Single script to run Horovod (may cause problems)
 
+## 🎉 New Feature: TensorFlow-like Progress Bar
+I am excited to announce the recent implementation of a TensorFlow-like progress bar in the library! This feature enhances the user experience by providing a visually appealing and informative way to track the progress of your computations.
+
+<div align="center">
+    <img src="assets/deepbar.jpg" alt="Progress Bar" width="500"/>
+</div>
+
+> The new progress bar is designed to be intuitive and easy to use, making it a perfect addition to your deep learning workflows.  
+
+
 > [!IMPORTANT]
 > Please, feel free to contribute to the lib. Let's develop some useful models and tools together! My contacts are in my profile

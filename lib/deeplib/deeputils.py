@@ -20,10 +20,7 @@ except ImportError:
 
 import __main__
 import numpy as np
-import tomli
-import tomli_w
 import torch
-# import zero
 
 from . import env
 
@@ -83,18 +80,6 @@ def unpack_config(config: RawConfig) -> RawConfig:
 def pack_config(config: RawConfig) -> RawConfig:
     config = cast(RawConfig, _replace(config, lambda x: x is None, _CONFIG_NONE))
     return config
-
-
-def load_config(path: Union[Path, str]) -> Any:
-    with open(path, 'rb') as f:
-        return unpack_config(tomli.load(f))
-
-
-def dump_config(config: Any, path: Union[Path, str]) -> None:
-    with open(path, 'wb') as f:
-        tomli_w.dump(pack_config(config), f)
-    # check that there are no bugs in all these "pack/unpack" things
-    assert config == load_config(path)
 
 
 def load_json(path: Union[Path, str], **kwargs) -> Any:

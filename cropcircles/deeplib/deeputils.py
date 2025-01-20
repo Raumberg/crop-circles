@@ -75,9 +75,6 @@ def _replace(data, condition, value):
 
     return do(data)
 
-
-
-
 def unpack_config(config: RawConfig) -> RawConfig:
     config = cast(RawConfig, _replace(config, lambda x: x == _CONFIG_NONE, None))
     return config
@@ -144,29 +141,23 @@ def _get_output_item_path(
 def load_report(path: Path) -> Report:
     return load_json(_get_output_item_path(path, 'report.json', True))
 
-
 def dump_report(report: dict, path: Path) -> None:
     dump_json(report, _get_output_item_path(path, 'report.json', False))
-
 
 def load_predictions(path: Path) -> Dict[str, np.ndarray]:
     with np.load(_get_output_item_path(path, 'predictions.npz', True)) as predictions:
         return {x: predictions[x] for x in predictions}
 
-
 def dump_predictions(predictions: Dict[str, np.ndarray], path: Path) -> None:
     np.savez(_get_output_item_path(path, 'predictions.npz', False), **predictions)
 
-
 def dump_metrics(metrics: Dict[str, Any], path: Path) -> None:
     dump_json(metrics, _get_output_item_path(path, 'metrics.json', False))
-
 
 def load_checkpoint(path: Path, *args, **kwargs) -> Dict[str, np.ndarray]:
     return torch.load(
         _get_output_item_path(path, 'checkpoint.pt', True), *args, **kwargs
     )
-
 
 def get_device() -> torch.device:
     if torch.cuda.is_available():
@@ -175,12 +166,8 @@ def get_device() -> torch.device:
     else:
         return torch.device('cpu')
 
-
 def _print_sep(c, size=100):
     print(c * size)
-
-
-
 
 def backup_output(output_dir: Path) -> None:
     backup_dir = os.environ.get('TMP_OUTPUT_PATH')
@@ -218,7 +205,6 @@ def backup_output(output_dir: Path) -> None:
         _LAST_SNAPSHOT_TIME = time.time()
         print('The snapshot was saved!')
 
-
 def _get_scores(metrics: Dict[str, Dict[str, Any]]) -> Optional[Dict[str, float]]:
     return (
         {k: v['score'] for k, v in metrics.items()}
@@ -226,14 +212,12 @@ def _get_scores(metrics: Dict[str, Dict[str, Any]]) -> Optional[Dict[str, float]
         else None
     )
 
-
 def format_scores(metrics: Dict[str, Dict[str, Any]]) -> str:
     return ' '.join(
         f"[{x}] {metrics[x]['score']:.3f}"
         for x in ['test', 'val', 'train']
         if x in metrics
     )
-
 
 def finish(output_dir: Path, report: dict) -> None:
     print()
@@ -273,7 +257,6 @@ def finish(output_dir: Path, report: dict) -> None:
     _print_sep('=')
     print()
 
-
 def from_dict(datacls: Type[T], data: dict) -> T:
     assert is_dataclass(datacls)
     data = deepcopy(data)
@@ -292,7 +275,6 @@ def from_dict(datacls: Type[T], data: dict) -> T:
                 data[field.name] = from_dict(get_args(field.type)[0], data[field.name])
     return datacls(**data)
 
-
 def replace_factor_with_value(
     config: RawConfig,
     key: str,
@@ -308,7 +290,6 @@ def replace_factor_with_value(
         assert bounds[0] <= factor <= bounds[1]
         config[key] = int(factor * reference_value)
 
-
 def get_temporary_copy(path: Union[str, Path]) -> Path:
     path = env.get_path(path)
     assert not path.is_dir() and not path.is_symlink()
@@ -318,7 +299,6 @@ def get_temporary_copy(path: Union[str, Path]) -> Path:
     shutil.copyfile(path, tmp_path)
     atexit.register(lambda: tmp_path.unlink())
     return tmp_path
-
 
 def get_python():
     python = Path('/miniconda3/envs/main/bin/python')

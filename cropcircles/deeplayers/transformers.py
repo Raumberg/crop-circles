@@ -8,7 +8,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from ..deepmodules import clones
+from ..deeplib import clones
 
 class LayerNorm(nn.Module):
     "Construct a layernorm module (See citation for details)."

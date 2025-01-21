@@ -3,8 +3,9 @@ import os
 
 from tensorboardX import SummaryWriter
 
+__all__ = ['DeepLogger']
 
-class LoggerBuilder:
+class DeepLogger:
     def __init__(self, config) -> None:
         self.config = config
         self.log_dir = os.path.join(config.output["log_dir"], config.output["save_dir"])

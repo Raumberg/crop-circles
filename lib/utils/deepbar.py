@@ -5,8 +5,9 @@ import sys
 import numpy as np
 import os
 
+__all__ = ['DeepBar']
 
-class Progbar:
+class DeepBar:
     """
     Displays a progress bar.
 
@@ -264,8 +265,3 @@ class Progbar:
 
     def _update_stateful_metrics(self, stateful_metrics):
         self.stateful_metrics = self.stateful_metrics.union(stateful_metrics)
-
-pbar = Progbar(target=200)
-for i in range(200):
-    time.sleep(0.3)
-    pbar.update(i)

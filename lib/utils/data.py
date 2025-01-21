@@ -30,6 +30,8 @@ from sklearn.preprocessing import StandardScaler, MinMaxScaler
 
 from typing import Dict, List, Tuple, Union, Optional
 
+__all__ = ['DataMiner']
+
 
 class DataWrapper:
     def __init__(self, data: Union[pd.DataFrame, pd.Series]):

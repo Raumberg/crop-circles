@@ -52,9 +52,9 @@ Dive deeper into the innovative architectures behind integrated models by explor
   Learn about the abstract mechanisms that make DANet a powerful tool for feature representation.
 - **RiegelRing**: [Read the original ExcelFormer Paper](https://arxiv.org/pdf/2301.02819)  
   Understand how RiegelRing adapts transformer architectures for tabular data.
-- **SuperForest**: SuperForest is developed by the author, Reisen Raumberg, 2024.
+- **SuperForest**: `SuperForest is developed by the author, Reisen Raumberg, 2024.`  
   Explore the hybrid approach that combines ensemble methods with deep learning techniques. Please, refer to the code base.
-- **TANDEM**: [Read the TANDEM Paper, Mostly developed by the author, Reisen Raumberg, 2024](https://arxiv.org/pdf/2106.11189)  
+- **TANDEM**: [Read the TANDEM Paper](https://arxiv.org/pdf/2106.11189), `mostly developed by the author, Reisen Raumberg, 2024`  
 Delve into the mechanisms that allow TANDEM to effectively model temporal dynamics in tabular datasets.
 
 These papers provide valuable insights into the methodologies and experiments that shaped the development of these models. Happy reading!
